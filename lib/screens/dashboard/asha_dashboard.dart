@@ -6,6 +6,7 @@ import '../../services/patient_service.dart';
 import '../patients/patient_details_screen.dart';
 import '../voice/voice_to_form_screen.dart';
 import '../qr/qr_scanner_screen.dart';
+import '../health_assistant/health_assistant_screen.dart';
 
 class AshaDashboard extends StatefulWidget {
   const AshaDashboard({super.key});
@@ -219,11 +220,11 @@ class _AshaDashboardState extends State<AshaDashboard> {
                   subtitle:
                       'Ask general health guidance questions.',
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Health Assistant coming next.',
-                        ),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const HealthAssistantScreen(),
                       ),
                     );
                   },
