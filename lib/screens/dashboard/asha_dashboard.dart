@@ -6,7 +6,7 @@ import '../../models/patient.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/patient_service.dart';
 import '../patients/patient_details_screen.dart';
-import '../patients/patient_list_screen.dart';
+import '../patient/patient_list_screen.dart';
 import '../voice/voice_to_form_screen.dart';
 import '../qr/qr_scanner_screen.dart';
 import '../health_assistant/health_assistant_screen.dart';
