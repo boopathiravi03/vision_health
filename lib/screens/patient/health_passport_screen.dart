@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../services/patient_service.dart';
+import '../../services/triage_ai_service.dart';
+import '../../services/triage_engine.dart';
+import '../triage/triage_result_screen.dart';
 
 class HealthPassportScreen extends StatefulWidget {
   final String patientId;
@@ -25,6 +28,9 @@ class _HealthPassportScreenState
 
   bool loading = true;
   String? error;
+
+  bool triageLoading = false;
+  String? triageError;
 
   @override
   void initState() {
@@ -51,6 +57,102 @@ class _HealthPassportScreenState
       setState(() {
         error = e.toString();
         loading = false;
+      });
+    }
+  }
+
+  Future<void> runTriage() async {
+    if (patient == null) {
+      return;
+    }
+
+    setState(() {
+      triageLoading = true;
+      triageError = null;
+    });
+
+    try {
+      final age = int.tryParse(
+            patient!['age']?.toString() ?? '',
+          ) ??
+          0;
+
+      final rawSymptoms =
+          patient!['symptoms'];
+
+      List<String> symptoms = [];
+
+      if (rawSymptoms is List) {
+        symptoms = rawSymptoms
+            .map((e) => e.toString())
+            .toList();
+      } else if (rawSymptoms != null) {
+        symptoms = [rawSymptoms.toString()];
+      }
+
+      final symptomText =
+          symptoms.join(' ').toLowerCase();
+
+      final assessment =
+          TriageEngine.assess(
+        age: age,
+        symptoms: symptoms,
+        difficultyBreathing:
+            symptomText.contains('difficulty breathing') ||
+                symptomText.contains('breathing difficulty'),
+        unconscious:
+            symptomText.contains('unconscious'),
+        severeBleeding:
+            symptomText.contains('severe bleeding'),
+        chestPain:
+            symptomText.contains('chest pain'),
+        seizure:
+            symptomText.contains('seizure'),
+        severeDehydration:
+            symptomText.contains('severe dehydration'),
+      );
+
+      final explanation =
+          await TriageAiService.getExplanation(
+        patientName:
+            patient!['name']?.toString() ??
+                'Patient',
+        age: age,
+        symptoms: symptoms,
+        riskLevel: assessment.riskLabel,
+        action: assessment.action,
+        language: 'English',
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        triageLoading = false;
+      });
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TriageResultScreen(
+            patientName:
+                patient!['name']?.toString() ??
+                    'Patient',
+            age: age,
+            symptoms: symptoms,
+            riskLevel: assessment.riskLabel,
+            action: assessment.action,
+            explanation:
+                explanation['explanation']?.toString() ??
+                    '',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        triageLoading = false;
+        triageError = e.toString();
       });
     }
   }
@@ -214,6 +316,43 @@ class _HealthPassportScreenState
             const SizedBox(height: 15),
 
             buildQr(),
+
+            const SizedBox(height: 20),
+
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: triageLoading ? null : runTriage,
+                icon: triageLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.medical_services,
+                      ),
+                label: Text(
+                  triageLoading
+                      ? 'RUNNING AI TRIAGE...'
+                      : 'RUN AI TRIAGE',
+                ),
+              ),
+            ),
+
+            if (triageError != null) ...[
+              const SizedBox(height: 12),
+
+              Text(
+                'Triage failed: $triageError',
+                style: const TextStyle(
+                  color: Colors.red,
+                ),
+              ),
+            ],
           ],
         ),
       ),
