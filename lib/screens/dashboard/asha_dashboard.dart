@@ -6,6 +6,7 @@ import '../../models/patient.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/patient_service.dart';
 import '../patients/patient_details_screen.dart';
+import '../patients/patient_list_screen.dart';
 import '../voice/voice_to_form_screen.dart';
 import '../qr/qr_scanner_screen.dart';
 import '../health_assistant/health_assistant_screen.dart';
@@ -301,6 +302,23 @@ class _AshaDashboardState extends State<AshaDashboard> {
                       MaterialPageRoute(
                         builder: (_) =>
                             const HealthAssistantScreen(),
+                      ),
+                    );
+                  },
+                ),
+
+                _toolCard(
+                  context,
+                  icon: Icons.people_outline,
+                  title: 'Patients',
+                  subtitle:
+                      'View, search and manage all patient records.',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const PatientListScreen(),
                       ),
                     );
                   },
