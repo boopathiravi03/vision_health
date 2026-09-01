@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../qr/qr_scanner_screen.dart';
 import '../voice/voice_to_form_screen.dart';
 import '../schemes/scheme_finder_screen.dart';
-import '../patients/patient_list_screen.dart';
 import '../vision/vision_screen.dart';
 import '../followup/followup_screen.dart';
 import '../../models/patient.dart';
@@ -325,6 +325,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                     child: _actionCard(
                       context,
+                      icon: Icons.qr_code_scanner_outlined,
+                      title: 'Scan Health\nPassport',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const QrScannerScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: _actionCard(
+                      context,
                       icon: Icons.camera_alt_outlined,
                       title: 'Visual\nScreening',
                       onTap: () {
@@ -350,23 +367,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           MaterialPageRoute(
                             builder: (_) =>
                                 const SchemeFinderScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: _actionCard(
-                      context,
-                      icon: Icons.people_outline,
-                      title: 'Patient\nRecords',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                PatientListScreen(),
                           ),
                         );
                       },
