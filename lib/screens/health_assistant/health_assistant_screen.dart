@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../../services/health_assistant_service.dart';
 
@@ -217,11 +218,31 @@ class _HealthAssistantScreenState
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            _response!,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.5,
+          MarkdownBody(
+            data: _response!,
+            styleSheet: MarkdownStyleSheet(
+              p: const TextStyle(
+                fontSize: 16,
+                height: 1.5,
+              ),
+              h1: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+              h2: const TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.bold,
+              ),
+              h3: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
+              tableHead: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+              tableBody: const TextStyle(
+                fontSize: 14,
+              ),
             ),
           ),
         ],

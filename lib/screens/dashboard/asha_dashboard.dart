@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../models/patient.dart';
 import '../../services/connectivity_service.dart';
@@ -7,6 +9,7 @@ import '../patients/patient_details_screen.dart';
 import '../voice/voice_to_form_screen.dart';
 import '../qr/qr_scanner_screen.dart';
 import '../health_assistant/health_assistant_screen.dart';
+import '../patient/health_passport_screen.dart';
 
 class AshaDashboard extends StatefulWidget {
   const AshaDashboard({super.key});
@@ -24,6 +27,72 @@ class _AshaDashboardState extends State<AshaDashboard> {
       ConnectivityService();
 
   bool _isOnline = true;
+
+  Future<void> signOut() async {
+    await FirebaseAuth.instance.signOut();
+
+    if (!mounted) return;
+
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      '/login',
+      (route) => false,
+    );
+  }
+
+  Future<void> createDemoPatient() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('patients')
+          .add({
+        'name': 'Demo Patient',
+        'age': 45,
+        'gender': 'Female',
+        'village': 'Demo Village',
+        'symptoms': [
+          'fever',
+          'cough',
+          'difficulty breathing',
+        ],
+        'duration': '2 days',
+        'severity': 'Moderate',
+        'redFlags': [
+          'difficulty breathing',
+        ],
+        'followUpRequired': true,
+        'transcript':
+            'Demo patient has fever and cough for two days with difficulty breathing.',
+        'createdAt': FieldValue.serverTimestamp(),
+        'source': 'DEMO_DATA',
+        'status': 'confirmed',
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Demo patient created successfully'),
+        ),
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => HealthPassportScreen(
+            patientId: doc.id,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Demo patient failed: $e'),
+        ),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -65,6 +134,11 @@ class _AshaDashboardState extends State<AshaDashboard> {
             icon: const Icon(
               Icons.notifications_outlined,
             ),
+          ),
+          IconButton(
+            onPressed: signOut,
+            icon: const Icon(Icons.logout),
+            tooltip: 'Sign Out',
           ),
         ],
       ),
@@ -170,6 +244,8 @@ class _AshaDashboardState extends State<AshaDashboard> {
                 const SizedBox(height: 12),
 
                 _quickActions(context),
+
+                _demoButton(),
 
                 const SizedBox(height: 26),
 
@@ -449,6 +525,17 @@ class _AshaDashboardState extends State<AshaDashboard> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _demoButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: createDemoPatient,
+        icon: const Icon(Icons.science),
+        label: const Text('LOAD DEMO PATIENT'),
+      ),
     );
   }
 
