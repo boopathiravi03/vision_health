@@ -35,7 +35,7 @@ class AIResult {
 class AIApiService {
   // Android emulator → computer localhost
   static const String baseUrl =
-      'https://mississippi-delivering-functions-taxes.trycloudflare.com';
+      'https://vision-health.onrender.com';
 
   Future<AIResult> analyze({
     required String patientName,

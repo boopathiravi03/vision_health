@@ -1,12 +1,11 @@
 import 'dart:convert';
-
 import 'package:http/http.dart' as http;
 
 class TriageAiService {
   static const String baseUrl =
-      'https://mississippi-delivering-functions-taxes.trycloudflare.com';
+      'https://vision-health.onrender.com';
 
-  static Future<String> getExplanation({
+  static Future<Map<String, dynamic>> getExplanation({
     required String patientName,
     required int age,
     required List<String> symptoms,
@@ -15,12 +14,10 @@ class TriageAiService {
     String language = 'English',
   }) async {
     final response = await http.post(
-      Uri.parse(
-        '$baseUrl/triage/explanation',
-      ),
+      Uri.parse('$baseUrl/triage/explanation'),
       headers: {
-        'Content-Type':
-            'application/json',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
       },
       body: jsonEncode({
         'patient_name': patientName,
@@ -34,21 +31,12 @@ class TriageAiService {
 
     if (response.statusCode != 200) {
       throw Exception(
-        'AI server error: ${response.statusCode}',
+        'Triage AI request failed: ${response.body}',
       );
     }
 
-    final data =
-        jsonDecode(response.body);
+    final decoded = jsonDecode(response.body);
 
-    if (data['success'] != true) {
-      throw Exception(
-        'AI explanation failed',
-      );
-    }
-
-    return data['explanation']
-            ?.toString() ??
-        'No explanation available.';
+    return Map<String, dynamic>.from(decoded);
   }
 }

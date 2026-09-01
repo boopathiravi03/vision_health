@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class AIService {
   static const String baseUrl =
-      'https://mississippi-delivering-functions-taxes.trycloudflare.com';
+      'https://vision-health.onrender.com';
 
   Future<String> analyzeHealthQuery(
     String query, {

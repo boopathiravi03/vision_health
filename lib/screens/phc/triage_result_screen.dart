@@ -22,7 +22,7 @@ class TriageResultScreen extends StatefulWidget {
 class _TriageResultScreenState
     extends State<TriageResultScreen> {
   TriageResult? result;
-  String? aiExplanation;
+  Map<String, dynamic>? aiExplanation;
   bool loadingExplanation = false;
 
   @override
@@ -86,8 +86,10 @@ class _TriageResultScreenState
       }
 
       setState(() {
-        aiExplanation =
-            'Unable to connect to the AI service.';
+        aiExplanation = {
+          'explanation':
+              'Unable to connect to the AI service.',
+        };
         loadingExplanation = false;
       });
     }
@@ -308,7 +310,9 @@ class _TriageResultScreenState
                       const SizedBox(height: 12),
 
                       Text(
-                        aiExplanation!,
+                        aiExplanation!['explanation']
+                                ?.toString() ??
+                            '',
                         style: const TextStyle(
                           fontSize: 16,
                           height: 1.5,

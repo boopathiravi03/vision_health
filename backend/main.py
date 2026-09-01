@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from groq import Groq
 
-load_dotenv()
+load_dotenv(override=True)
 
 api_key = os.getenv("GROQ_API_KEY")
 
@@ -438,7 +438,7 @@ async def vision_analyze(
         ).decode("utf-8")
 
         response = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
+            model="qwen/qwen3.6-27b",
             messages=[
                 {
                     "role": "system",
@@ -488,6 +488,7 @@ Never prescribe medication.
                             "text": """
 Assess the image for visible health-related
 observations only. Do not diagnose.
+Return the result as JSON.
 """,
                         },
                         {
@@ -501,6 +502,7 @@ observations only. Do not diagnose.
                 },
             ],
             temperature=0,
+            response_format={"type": "json_object"},
         )
 
         content = response.choices[0].message.content
