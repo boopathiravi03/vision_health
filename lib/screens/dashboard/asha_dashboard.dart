@@ -46,33 +46,31 @@ class _AshaDashboardState extends State<AshaDashboard> {
       final doc = await FirebaseFirestore.instance
           .collection('patients')
           .add({
-        'name': 'Demo Patient',
+        'name': 'Ramesh Kumar',
         'age': 45,
-        'gender': 'Female',
-        'village': 'Demo Village',
-        'symptoms': [
-          'fever',
-          'cough',
-          'difficulty breathing',
-        ],
-        'duration': '2 days',
-        'severity': 'Moderate',
-        'redFlags': [
-          'difficulty breathing',
-        ],
-        'followUpRequired': true,
-        'transcript':
-            'Demo patient has fever and cough for two days with difficulty breathing.',
-        'createdAt': FieldValue.serverTimestamp(),
-        'source': 'DEMO_DATA',
+        'gender': 'Male',
+        'village': 'Kovilur',
+        'phone': '',
+        'symptoms':
+            'Fever, Cough, Weakness',
         'status': 'confirmed',
+        'followUpDate': DateTime.now()
+                .add(const Duration(days: 1))
+                .toIso8601String()
+                .split('T')
+                .first,
+        'riskLevel': 'Follow-up',
+        'aiRecommendation':
+            'ASHA worker should monitor the patient and arrange a health-facility evaluation if symptoms persist or worsen.',
       });
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Demo patient created successfully'),
+          content: Text(
+            'Demo patient created successfully',
+          ),
         ),
       );
 
@@ -89,9 +87,50 @@ class _AshaDashboardState extends State<AshaDashboard> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Demo patient failed: $e'),
+          content: Text(
+            'Demo patient failed: $e',
+          ),
         ),
       );
+    }
+  }
+
+  Future<void> _seedDemoIfEmpty() async {
+    try {
+      final patients =
+          await _patientService
+              .getPatients()
+              .first;
+
+      if (patients.isEmpty &&
+          mounted) {
+        await FirebaseFirestore.instance
+            .collection('patients')
+            .add({
+          'name': 'Ramesh Kumar',
+          'age': 45,
+          'gender': 'Male',
+          'village': 'Kovilur',
+          'phone': '',
+          'symptoms':
+              'Fever, Cough, Weakness',
+          'status': 'confirmed',
+          'followUpDate': DateTime.now()
+                  .add(
+                    const Duration(
+                      days: 1,
+                    ),
+                  )
+                  .toIso8601String()
+                  .split('T')
+                  .first,
+          'riskLevel': 'Follow-up',
+          'aiRecommendation':
+              'ASHA worker should monitor the patient and arrange a health-facility evaluation if symptoms persist or worsen.',
+        });
+      }
+    } catch (_) {
+      // ignore demo seed failures
     }
   }
 
@@ -106,6 +145,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
         });
       }
     });
+    _seedDemoIfEmpty();
   }
 
   Future<void> _checkConnectivity() async {
