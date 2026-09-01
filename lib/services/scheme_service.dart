@@ -1,110 +1,35 @@
-import '../models/health_scheme.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class SchemeService {
-  static const List<HealthScheme> schemes = [
-    HealthScheme(
-      id: 'pmjay',
-      name: 'Ayushman Bharat PM-JAY',
-      description:
-          'Health coverage support for eligible families.',
-      eligibility:
-          'Eligibility depends on the beneficiary database and applicable government criteria.',
-      documents: [
-        'Aadhaar or accepted ID',
-        'Beneficiary identification details',
-        'Other documents requested by the facility',
-      ],
-      steps: [
-        'Check beneficiary eligibility',
-        'Visit an empanelled health facility',
-        'Carry the required identification documents',
-        'Complete beneficiary verification',
-      ],
-      category: 'Health Coverage',
-    ),
+  static const String baseUrl =
+      'https://vision-health.onrender.com';
 
-    HealthScheme(
-      id: 'maternity',
-      name: 'Maternity Support',
-      description:
-          'Government maternity-related support for eligible beneficiaries.',
-      eligibility:
-          'Eligibility depends on the applicable maternity programme and beneficiary criteria.',
-      documents: [
-        'Aadhaar or accepted ID',
-        'Pregnancy-related records',
-        'Bank details where applicable',
-      ],
-      steps: [
-        'Visit the nearest government health facility',
-        'Complete pregnancy registration',
-        'Submit required documents',
-        'Follow the facility instructions for benefit processing',
-      ],
-      category: 'Maternal Health',
-    ),
-
-    HealthScheme(
-      id: 'immunization',
-      name: 'Universal Immunization Programme',
-      description:
-          'Supports access to recommended childhood immunization services.',
-      eligibility:
-          'Children and eligible beneficiaries according to the applicable immunization schedule.',
-      documents: [
-        'Child health/immunization record',
-        'Parent or guardian identification where required',
-      ],
-      steps: [
-        'Check the child vaccination record',
-        'Identify the next due vaccination',
-        'Visit the nearest vaccination centre',
-        'Update the vaccination record',
-      ],
-      category: 'Child Health',
-    ),
-  ];
-
-  List<HealthScheme> findRelevantSchemes({
+  static Future<Map<String, dynamic>> findSchemes({
     required int age,
     required String gender,
-    required String symptoms,
-  }) {
-    final results = <HealthScheme>[];
+    required String situation,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/scheme-finder'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'age': age,
+        'gender': gender,
+        'situation': situation,
+      }),
+    );
 
-    final text = symptoms.toLowerCase();
-    final normalizedGender = gender.toLowerCase();
-
-    // General health coverage
-    results.add(schemes.firstWhere(
-      (scheme) => scheme.id == 'pmjay',
-    ));
-
-    // Maternal health
-    if (normalizedGender == 'female' &&
-        age >= 18 &&
-        (text.contains('pregnant') ||
-            text.contains('pregnancy') ||
-            text.contains('maternity'))) {
-      results.add(
-        schemes.firstWhere(
-          (scheme) => scheme.id == 'maternity',
-        ),
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Scheme request failed: ${response.body}',
       );
     }
 
-    // Child health
-    if (age < 6 &&
-        (text.contains('vaccine') ||
-            text.contains('vaccination') ||
-            text.contains('immunization'))) {
-      results.add(
-        schemes.firstWhere(
-          (scheme) => scheme.id == 'immunization',
-        ),
-      );
-    }
-
-    return results;
+    return Map<String, dynamic>.from(
+      jsonDecode(response.body),
+    );
   }
 }

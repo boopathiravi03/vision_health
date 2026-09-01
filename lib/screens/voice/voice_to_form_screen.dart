@@ -8,9 +8,8 @@ import '../../services/alert_service.dart';
 import '../../services/groq_service.dart';
 import '../../services/patient_service.dart';
 import '../../services/risk_service.dart';
-import '../../services/scheme_service.dart';
 import '../patient/health_passport_screen.dart';
-import '../schemes/scheme_screen.dart';
+import '../schemes/scheme_finder_screen.dart';
 
 class VoiceToFormScreen extends StatefulWidget {
   const VoiceToFormScreen({
@@ -34,9 +33,6 @@ class _VoiceToFormScreenState
 
   final RiskService _riskService =
       RiskService();
-
-  final SchemeService _schemeService =
-      SchemeService();
 
   final AlertService _alertService =
       AlertService();
@@ -276,22 +272,14 @@ class _VoiceToFormScreenState
               ),
               FilledButton.icon(
                 onPressed: () {
-                  final schemes =
-                      _schemeService.findRelevantSchemes(
-                    age: age,
-                    gender: gender,
-                    symptoms: symptoms,
-                  );
-
                   Navigator.pop(context);
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          SchemeScreen(
-                        schemes: schemes,
-                        patientName: name,
-                        patientId: patientId,
+                      builder: (_) => SchemeFinderScreen(
+                        age: age,
+                        gender: gender,
+                        situation: symptoms,
                       ),
                     ),
                   );

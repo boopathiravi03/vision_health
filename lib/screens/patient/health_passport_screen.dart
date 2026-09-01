@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../services/patient_service.dart';
 import '../../services/triage_ai_service.dart';
 import '../../services/triage_engine.dart';
+import '../schemes/scheme_finder_screen.dart';
 import '../triage/triage_result_screen.dart';
 
 class HealthPassportScreen extends StatefulWidget {
@@ -353,6 +354,48 @@ class _HealthPassportScreenState
                 ),
               ),
             ],
+
+            const SizedBox(height: 12),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  final age = int.tryParse(
+                        patient!['age']?.toString() ?? '',
+                      ) ??
+                      0;
+
+                  final gender =
+                      patient!['gender']?.toString() ?? '';
+
+                  final symptoms =
+                      patient!['symptoms'] is List
+                          ? (patient!['symptoms'] as List)
+                              .map((e) => e.toString())
+                              .join(', ')
+                          : '';
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          SchemeFinderScreen(
+                        age: age,
+                        gender: gender,
+                        situation: symptoms,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(
+                  Icons.account_balance,
+                ),
+                label: const Text(
+                  'FIND GOVERNMENT SCHEMES',
+                ),
+              ),
+            ),
           ],
         ),
       ),

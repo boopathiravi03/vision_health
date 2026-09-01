@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/patient.dart';
-import '../../services/scheme_service.dart';
-import '../schemes/scheme_screen.dart';
+import '../schemes/scheme_finder_screen.dart';
 
 class PatientDetailsScreen extends StatelessWidget {
   final Patient patient;
@@ -279,24 +278,13 @@ class PatientDetailsScreen extends StatelessWidget {
 
       child: FilledButton.icon(
         onPressed: () {
-          final service =
-              SchemeService();
-
-          final schemes =
-              service.findRelevantSchemes(
-            age: patient.age,
-            gender: patient.gender,
-            symptoms: patient.symptoms,
-          );
-
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) =>
-                  SchemeScreen(
-                schemes: schemes,
-                patientName: patient.name,
-                patientId: patient.id,
+              builder: (_) => SchemeFinderScreen(
+                age: patient.age,
+                gender: patient.gender,
+                situation: patient.symptoms,
               ),
             ),
           );
