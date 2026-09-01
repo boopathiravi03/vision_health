@@ -5,6 +5,7 @@ import '../../services/connectivity_service.dart';
 import '../../services/patient_service.dart';
 import '../patients/patient_details_screen.dart';
 import '../voice/voice_to_form_screen.dart';
+import '../qr/qr_scanner_screen.dart';
 
 class AshaDashboard extends StatefulWidget {
   const AshaDashboard({super.key});
@@ -172,10 +173,63 @@ class _AshaDashboardState extends State<AshaDashboard> {
                 const SizedBox(height: 26),
 
                 _sectionTitle(
-                  'Needs Attention',
+                  'Tools',
                 ),
 
                 const SizedBox(height: 12),
+
+                _toolCard(
+                  context,
+                  icon: Icons.medical_services,
+                  title: 'AI Triage',
+                  subtitle:
+                      'Open a patient record to run risk assessment.',
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Open a patient record to run AI Triage.',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                _toolCard(
+                  context,
+                  icon: Icons.account_balance,
+                  title: 'Government Schemes',
+                  subtitle:
+                      'Find preliminary scheme information for a patient.',
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Open a patient record to find schemes.',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                _toolCard(
+                  context,
+                  icon: Icons.smart_toy,
+                  title: 'Health Assistant',
+                  subtitle:
+                      'Ask general health guidance questions.',
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Health Assistant coming next.',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 26),
 
                 _attentionList(
                   context,
@@ -380,10 +434,16 @@ class _AshaDashboardState extends State<AshaDashboard> {
         Expanded(
           child: _actionCard(
             context,
-            Icons.person_add,
-            'Add Patient',
+            Icons.qr_code_scanner,
+            'Scan Passport',
             () {
-              // Connect to Add Patient screen.
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const QrScannerScreen(),
+                ),
+              );
             },
           ),
         ),
@@ -438,6 +498,80 @@ class _AshaDashboardState extends State<AshaDashboard> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _toolCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(17),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F6F3),
+                    borderRadius:
+                        BorderRadius.circular(15),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: const Color(0xFF087F73),
+                    size: 28,
+                  ),
+                ),
+
+                const SizedBox(width: 15),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: Colors.grey,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
