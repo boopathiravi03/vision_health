@@ -1,0 +1,11 @@
+.env
+backend/.env
+backend/venv/
+venv/
+tunnel.log
+.env
+
+build/
+venv/
+tunnel.log
+.env

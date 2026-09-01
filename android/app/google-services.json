@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1064308986376",
+    "project_id": "vission-health-39cb2",
+    "storage_bucket": "vission-health-39cb2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1064308986376:android:105d5ed41413708e0537bd",
+        "android_client_info": {
+          "package_name": "com.example.vission_health"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC7wIQ6sJvsxIE7_Wcbgl2ElnrXHAbxVjY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
