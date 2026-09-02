@@ -12,7 +12,6 @@ import '../voice/voice_to_form_screen.dart';
 import '../qr/qr_scanner_screen.dart';
 import '../health_assistant/health_assistant_screen.dart';
 import '../patient/health_passport_screen.dart';
-import '../schemes/scheme_finder_screen.dart';
 
 class AshaDashboard extends StatefulWidget {
   const AshaDashboard({super.key});
@@ -136,96 +135,6 @@ class _AshaDashboardState extends State<AshaDashboard> {
     } catch (_) {
       // ignore demo seed failures
     }
-  }
-
-  Future<void> _selectPatientForTriage(BuildContext context) async {
-    final patients = await _patientService.getPatients().first;
-
-    if (!mounted) return;
-
-    if (patients.isEmpty) {
-      _showNoPatientsDialog(context);
-      return;
-    }
-
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => _patientSelectorBottomSheet(
-        patients: patients,
-        onSelect: (patient) {
-          Navigator.pop(sheetContext);
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => HealthPassportScreen(
-                patientId: patient.id,
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _selectPatientForSchemes(BuildContext context) async {
-    final patients = await _patientService.getPatients().first;
-
-    if (!mounted) return;
-
-    if (patients.isEmpty) {
-      _showNoPatientsDialog(context);
-      return;
-    }
-
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => _patientSelectorBottomSheet(
-        patients: patients,
-        onSelect: (patient) {
-          Navigator.pop(sheetContext);
-          _openSchemeFinder(patient);
-        },
-      ),
-    );
-  }
-
-  void _openSchemeFinder(Patient patient) {
-    final age = patient.age;
-    final gender = patient.gender;
-    final symptoms = patient.symptoms;
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => SchemeFinderScreen(
-          age: age,
-          gender: gender,
-          situation: symptoms,
-        ),
-      ),
-    );
-  }
-
-  void _showNoPatientsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('No patients yet'),
-          content: const Text(
-            'Create a patient record using Voice-to-Form or Add Patient, then try again.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   @override
@@ -394,18 +303,30 @@ class _AshaDashboardState extends State<AshaDashboard> {
                   context,
                   icon: Icons.medical_services,
                   title: 'AI Triage',
-                  subtitle:
-                      'Select a patient and run risk assessment.',
-                  onTap: () => _selectPatientForTriage(context),
+                  subtitle: 'Select a patient to assess risk and get next-step guidance.',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PatientListScreen(),
+                      ),
+                    );
+                  },
                 ),
 
                 _toolCard(
                   context,
                   icon: Icons.account_balance,
                   title: 'Government Schemes',
-                  subtitle:
-                      'Find preliminary scheme information for a patient.',
-                  onTap: () => _selectPatientForSchemes(context),
+                  subtitle: 'Select a patient to find relevant government health benefits.',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PatientListScreen(),
+                      ),
+                    );
+                  },
                 ),
 
                 _toolCard(
@@ -1064,120 +985,6 @@ class _AshaDashboardState extends State<AshaDashboard> {
         style: const TextStyle(
           color: Colors.grey,
         ),
-      ),
-    );
-  }
-
-  Widget _patientSelectorBottomSheet({
-    required List<Patient> patients,
-    required ValueChanged<Patient> onSelect,
-  }) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Select Patient',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Flexible(
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: patients.length,
-              itemBuilder: (context, index) {
-                final patient = patients[index];
-                final symptoms = patient.symptoms;
-
-                return InkWell(
-                  onTap: () => onSelect(patient),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: const Color(0xFFE0E9E6),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor:
-                              const Color(0xFFE8F6F3),
-                          child: Text(
-                            patient.name.isNotEmpty
-                                ? patient.name[0].toUpperCase()
-                                : '?',
-                            style: const TextStyle(
-                              color: Color(0xFF087F73),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                patient.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: Color(0xFF073B36),
-                                fontFamily: 'Inter',
-                              ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                '${patient.age} years • ${patient.village}',
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                  fontFamily: 'Inter',
-                                ),
-                              ),
-                              if (symptoms.isNotEmpty) ...[
-                                const SizedBox(height: 3),
-                                Text(
-                                  symptoms,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 12,
-                                    fontFamily: 'Inter',
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const Icon(
-                          Icons.chevron_right,
-                          color: Colors.grey,
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
       ),
     );
   }

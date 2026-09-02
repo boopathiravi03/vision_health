@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'health_passport_screen.dart';
+import '../schemes/scheme_finder_screen.dart';
 
 class PatientListScreen extends StatefulWidget {
   const PatientListScreen({super.key});
@@ -51,24 +52,35 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
       backgroundColor: const Color(0xFFF5F9F8),
 
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF087F73),
-        foregroundColor: Colors.white,
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Use AI Speech-to-Form to create a new patient.'),
-            ),
-          );
-        },
-        icon: const Icon(Icons.person_add),
-        label: const Text('Add Patient'),
-      ),
-
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F6F3),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.touch_app_rounded, color: Color(0xFF087F73)),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Select a patient to view their health record, run AI Triage, or find Government Schemes.',
+                      style: TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF245A54)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: TextField(
               controller: searchController,
               onChanged: (value) {
@@ -83,7 +95,6 @@ class _PatientListScreenState extends State<PatientListScreen> {
                     ? IconButton(
                         onPressed: () {
                           searchController.clear();
-
                           setState(() {
                             searchText = '';
                           });
@@ -184,8 +195,8 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
     final severity =
         data['severity']?.toString() ??
-        data['riskLevel']?.toString() ??
-        'Not assessed';
+            data['riskLevel']?.toString() ??
+            'Not assessed';
 
     String symptomText = 'No symptoms recorded';
 
@@ -266,12 +277,9 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
                   PopupMenuButton<String>(
                     onSelected: (value) {
-                       if (value == 'delete') {
-                         _deletePatient(
-                           patientId,
-                           name,
-                         );
-                       }
+                      if (value == 'delete') {
+                        _deletePatient(patientId, name);
+                      }
                     },
                     itemBuilder: (context) => const [
                       PopupMenuItem(
@@ -344,6 +352,60 @@ class _PatientListScreenState extends State<PatientListScreen> {
                     Icons.arrow_forward,
                     size: 16,
                     color: Color(0xFF087F73),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => HealthPassportScreen(
+                              patientId: patientId,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.medical_services_outlined, size: 18),
+                      label: const Text('AI TRIAGE'),
+                    ),
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        final patientAge = int.tryParse(age) ?? 0;
+                        final patientGender = gender;
+
+                        String situation = '';
+                        if (symptoms is List) {
+                          situation = symptoms.map((e) => e.toString()).join(', ');
+                        } else if (symptoms != null) {
+                          situation = symptoms.toString();
+                        }
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SchemeFinderScreen(
+                              age: patientAge,
+                              gender: patientGender,
+                              situation: situation,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.account_balance, size: 18),
+                      label: const Text('SCHEMES'),
+                    ),
                   ),
                 ],
               ),
