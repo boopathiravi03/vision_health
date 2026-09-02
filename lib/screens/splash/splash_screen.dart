@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../auth/login_screen.dart';
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -214,9 +216,12 @@ class RoleSelectionScreen extends StatelessWidget {
               subtitle:
                   'Register patients, use AI tools and manage follow-ups.',
               onTap: () {
-                Navigator.pushReplacementNamed(
+                Navigator.push(
                   context,
-                  '/login',
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const LoginScreen(),
+                  ),
                 );
               },
             ),
