@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../dashboard/asha_dashboard.dart';
-
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -216,10 +214,27 @@ class RoleSelectionScreen extends StatelessWidget {
               subtitle:
                   'Register patients, use AI tools and manage follow-ups.',
               onTap: () {
-                Navigator.pushReplacement(
+                Navigator.pushReplacementNamed(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const AshaDashboard(),
+                  '/login',
+                );
+              },
+            ),
+
+            const SizedBox(height: 16),
+
+            _roleCard(
+              context,
+              icon: Icons.person_outline,
+              title: 'Patient',
+              subtitle:
+                  'Access your health passport, QR records and care instructions.',
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Patient portal will be connected next.',
+                    ),
                   ),
                 );
               },

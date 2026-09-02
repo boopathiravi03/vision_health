@@ -36,7 +36,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
 
     Navigator.pushNamedAndRemoveUntil(
       context,
-      '/login',
+      '/splash',
       (route) => false,
     );
   }
