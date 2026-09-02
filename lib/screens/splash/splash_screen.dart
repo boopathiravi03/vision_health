@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../auth/login_screen.dart';
+import '../dashboard/asha_dashboard.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -19,10 +21,17 @@ class _SplashScreenState extends State<SplashScreen> {
     Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
 
+      final user =
+          FirebaseAuth.instance.currentUser;
+
+      final destination = user != null
+          ? const AshaDashboard()
+          : const WelcomeScreen();
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => const WelcomeScreen(),
+          builder: (_) => destination,
         ),
       );
     });
