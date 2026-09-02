@@ -4,8 +4,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../services/patient_service.dart';
 import '../../services/triage_ai_service.dart';
 import '../../services/triage_engine.dart';
-import '../../services/scheme_service.dart';
 import '../triage/triage_result_screen.dart';
+import '../schemes/scheme_finder_screen.dart';
 
 class HealthPassportScreen extends StatefulWidget {
   final String patientId;
@@ -158,77 +158,6 @@ class _HealthPassportScreenState
     }
   }
 
-  Future<void> findGovernmentSchemes() async {
-    if (patient == null) return;
-
-    try {
-      final age =
-          int.tryParse(patient!['age']?.toString() ?? '') ?? 0;
-
-      final gender =
-          patient!['gender']?.toString() ?? '';
-
-      final symptoms = patient!['symptoms'];
-
-      String situation = '';
-
-      if (symptoms is List) {
-        situation = symptoms.map((e) => e.toString()).join(', ');
-      } else {
-        situation = symptoms?.toString() ?? '';
-      }
-
-      if (situation.trim().isEmpty) {
-        situation = 'General healthcare support';
-      }
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 18),
-              Expanded(
-                child: Text(
-                  'Finding relevant government schemes...',
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-
-      final result = await SchemeService.findSchemes(
-        age: age,
-        gender: gender,
-        situation: situation,
-      );
-
-      if (!mounted) return;
-
-      Navigator.pop(context);
-
-      showDialog(
-        context: context,
-        builder: (_) => _schemeDialog(result),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      Navigator.pop(context);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to find schemes: $e',
-          ),
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (loading) {
@@ -376,21 +305,6 @@ class _HealthPassportScreenState
 
             const SizedBox(height: 25),
 
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: findGovernmentSchemes,
-                icon: const Icon(
-                  Icons.account_balance,
-                ),
-                label: const Text(
-                  'FIND GOVERNMENT SCHEMES',
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
             const Center(
               child: Text(
                 'Scan this QR at the PHC',
@@ -403,6 +317,64 @@ class _HealthPassportScreenState
             const SizedBox(height: 15),
 
             buildQr(),
+
+            const SizedBox(height: 24),
+
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  final patientAge =
+                      int.tryParse(patient!['age']?.toString() ?? '') ?? 0;
+
+                  final patientGender =
+                      patient!['gender']?.toString() ?? '';
+
+                  final rawSymptoms = patient!['symptoms'];
+
+                  String situation = '';
+
+                  if (rawSymptoms is List) {
+                    situation = rawSymptoms
+                        .map((e) => e.toString())
+                        .join(', ');
+                  } else if (rawSymptoms != null) {
+                    situation = rawSymptoms.toString();
+                  }
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SchemeFinderScreen(
+                        age: patientAge,
+                        gender: patientGender,
+                        situation: situation,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(
+                  Icons.account_balance_outlined,
+                  color: Color(0xFF087F73),
+                ),
+                label: const Text(
+                  'FIND GOVERNMENT SCHEMES',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF087F73),
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(
+                    color: Color(0xFF087F73),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
 
             const SizedBox(height: 20),
 
@@ -502,145 +474,6 @@ class _HealthPassportScreenState
       child: QrImageView(
         data: widget.patientId,
         size: 220,
-      ),
-    );
-  }
-
-  Widget _schemeDialog(Map<String, dynamic> result) {
-    final schemes = result['schemes'];
-
-    if (schemes is! List || schemes.isEmpty) {
-      return const AlertDialog(
-        title: Text('Government Schemes'),
-        content: Text(
-          'No schemes were identified from the available information. '
-          'Please verify eligibility with the appropriate health department.',
-        ),
-      );
-    }
-
-    return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(
-            Icons.account_balance,
-            color: Color(0xFF087F73),
-          ),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text('Government Schemes'),
-          ),
-        ],
-      ),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: ListView(
-          shrinkWrap: true,
-          children: schemes.map<Widget>((scheme) {
-            final data =
-                Map<String, dynamic>.from(scheme);
-
-            final documents = data['documents'];
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data['name']?.toString() ??
-                          'Government Scheme',
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF087F73),
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    Text(
-                      data['description']?.toString() ??
-                          '',
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    _schemeLabel(
-                      'Why this may apply',
-                      data['why_eligible'],
-                    ),
-
-                    _schemeLabel(
-                      'Where to apply',
-                      data['where_to_apply'],
-                    ),
-
-                    _schemeLabel(
-                      'Action',
-                      data['action'],
-                    ),
-
-                    if (documents is List &&
-                        documents.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Documents',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      ...documents.map(
-                        (doc) => Text(
-                          '• ${doc.toString()}',
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('CLOSE'),
-        ),
-      ],
-    );
-  }
-
-  Widget _schemeLabel(
-    String title,
-    dynamic value,
-  ) {
-    final text = value?.toString() ?? '';
-
-    if (text.trim().isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(text),
-        ],
       ),
     );
   }
