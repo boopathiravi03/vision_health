@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../auth/login_screen.dart';
 import '../dashboard/asha_dashboard.dart';
-import '../patient/patient_portal_screen.dart';
-import '../phc/phc_dashboard_screen.dart';
+import '../patient_portal/patient_portal_screen.dart';
+import '../phc/phc_staff_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -269,7 +269,7 @@ class RoleSelectionScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (_) =>
-                        const PhcDashboardScreen(),
+                        const PhcStaffScreen(),
                   ),
                 );
               },
