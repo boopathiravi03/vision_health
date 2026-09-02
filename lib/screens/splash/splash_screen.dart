@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../auth/login_screen.dart';
 import '../dashboard/asha_dashboard.dart';
+import '../patient/patient_portal_screen.dart';
+import '../phc/phc_dashboard_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -244,11 +246,11 @@ class RoleSelectionScreen extends StatelessWidget {
               subtitle:
                   'Access your health passport, QR records and care instructions.',
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Patient portal will be connected next.',
-                    ),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const PatientPortalScreen(),
                   ),
                 );
               },
@@ -263,11 +265,11 @@ class RoleSelectionScreen extends StatelessWidget {
               subtitle:
                   'View patient records and manage healthcare referrals.',
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'PHC Staff login will be connected next.',
-                    ),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const PhcDashboardScreen(),
                   ),
                 );
               },
