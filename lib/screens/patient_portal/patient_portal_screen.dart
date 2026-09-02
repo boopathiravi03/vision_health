@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'patient_ai_voice_screen.dart';
+import 'patient_ai_assistant_screen.dart';
 import 'patient_ai_scanner_screen.dart';
 import 'patient_benefits_screen.dart';
 import 'medicine_scanner_screen.dart';
@@ -39,17 +39,17 @@ class PatientPortalScreen extends StatelessWidget {
 
             _featureCard(
               context,
-              icon: Icons.mic_rounded,
-              title: 'Talk to Vission AI',
+              icon: Icons.record_voice_over_rounded,
+              title: 'Talk to AI',
               subtitle:
-                  'Speak in your language and get simple health guidance.',
+                  'Speak in your language and hear simple health guidance.',
               color: const Color(0xFF087F73),
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) =>
-                        const PatientAiVoiceScreen(),
+                        const PatientAiAssistantScreen(),
                   ),
                 );
               },
