@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'patient_ai_voice_screen.dart';
 import 'patient_ai_scanner_screen.dart';
 import 'patient_benefits_screen.dart';
+import 'medicine_scanner_screen.dart';
 
 class PatientPortalScreen extends StatelessWidget {
   const PatientPortalScreen({super.key});
@@ -157,6 +158,24 @@ class PatientPortalScreen extends StatelessWidget {
                   MaterialPageRoute(
                     builder: (_) =>
                         const PatientBenefitsScreen(),
+                  ),
+                );
+              },
+            ),
+
+            _featureCard(
+              context,
+              icon: Icons.medication_outlined,
+              title: 'Scan Medicine',
+              subtitle:
+                  'Forgot what a tablet is? Scan the package and get a simple explanation.',
+              color: const Color(0xFF1565C0),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const MedicineScannerScreen(),
                   ),
                 );
               },
