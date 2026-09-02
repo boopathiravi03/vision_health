@@ -4,14 +4,18 @@ import 'package:flutter/material.dart';
 import 'health_passport_screen.dart';
 import '../schemes/scheme_finder_screen.dart';
 
-enum PatientSelectionAction { triage, schemes }
+enum PatientSelectionAction {
+  none,
+  triage,
+  schemes,
+}
 
 class PatientListScreen extends StatefulWidget {
-  final PatientSelectionAction? action;
+  final PatientSelectionAction action;
 
   const PatientListScreen({
     super.key,
-    this.action,
+    this.action = PatientSelectionAction.none,
   });
 
   @override
@@ -51,9 +55,11 @@ class _PatientListScreenState extends State<PatientListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Patients',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          widget.action == PatientSelectionAction.schemes
+              ? 'Select Patient'
+              : 'Patients',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
 
@@ -61,30 +67,33 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F6F3),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.touch_app_rounded, color: Color(0xFF087F73)),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Select a patient to view their health record, run AI Triage, or find Government Schemes.',
-                      style: TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF245A54)),
+          if (widget.action == PatientSelectionAction.schemes)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F6F3),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.account_balance, color: Color(0xFF087F73)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Select a patient to find relevant government health schemes.',
+                        style: TextStyle(
+                          color: Color(0xFF087F73),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
 
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -399,7 +408,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
               const SizedBox(height: 14),
 
-              if (widget.action == null) ...[
+              if (widget.action == PatientSelectionAction.none) ...[
                 Row(
                   children: [
                     Expanded(
