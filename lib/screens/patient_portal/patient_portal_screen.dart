@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'patient_ai_voice_screen.dart';
+import 'patient_ai_scanner_screen.dart';
 
 class PatientPortalScreen extends StatelessWidget {
   const PatientPortalScreen({super.key});
@@ -60,10 +61,12 @@ class PatientPortalScreen extends StatelessWidget {
                   'Take a photo and let AI explain what is visible.',
               color: const Color(0xFF1565C0),
               onTap: () {
-                _showComingSoon(
+                Navigator.push(
                   context,
-                  'AI Image Scanner',
-                  'Camera-based medicine and report analysis will open here.',
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const PatientAiScannerScreen(),
+                  ),
                 );
               },
             ),
