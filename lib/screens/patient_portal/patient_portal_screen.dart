@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'patient_ai_voice_screen.dart';
 import 'patient_ai_scanner_screen.dart';
+import 'patient_benefits_screen.dart';
 
 class PatientPortalScreen extends StatelessWidget {
   const PatientPortalScreen({super.key});
@@ -151,10 +152,12 @@ class PatientPortalScreen extends StatelessWidget {
                   'Check schemes and benefits that may apply to you.',
               color: const Color(0xFF087F73),
               onTap: () {
-                _showComingSoon(
+                Navigator.push(
                   context,
-                  'Government Schemes',
-                  'Your eligible government health benefits will appear here.',
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const PatientBenefitsScreen(),
+                  ),
                 );
               },
             ),
