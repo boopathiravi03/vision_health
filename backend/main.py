@@ -426,6 +426,133 @@ Important:
     return result
 
 
+@app.post("/medicine-analyze")
+async def medicine_analyze(
+    file: UploadFile = File(...)
+):
+    try:
+        image_bytes = await file.read()
+
+        if not image_bytes:
+            raise HTTPException(
+                status_code=400,
+                detail="Image is empty."
+            )
+
+        encoded_image = base64.b64encode(
+            image_bytes
+        ).decode("utf-8")
+
+        response = client.chat.completions.create(
+            model="qwen/qwen3.6-27b",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+You are a cautious medicine-package information
+assistant for Vission Health.
+
+Analyze ONLY information visibly present on the
+medicine strip, box or package.
+
+Do NOT diagnose.
+Do NOT prescribe.
+Do NOT tell the patient to start, stop or change
+a medicine.
+
+Return ONLY valid JSON.
+
+Required format:
+
+{
+  "image_quality_good": true,
+  "medicine_name": "",
+  "strength": "",
+  "visible_text": "",
+  "medicine_type": "",
+  "what_it_appears_to_be_for": "",
+  "instructions_visible": "",
+  "confidence": "LOW",
+  "needs_verification": true,
+  "simple_explanation": "",
+  "warning": "Confirm the medicine with an ASHA worker, doctor or pharmacist."
+}
+
+Rules:
+
+1. Never invent a medicine name.
+2. Never guess the strength.
+3. If the medicine name cannot be read,
+   return an empty string.
+4. If the image is blurry or unclear,
+   image_quality_good must be false.
+5. confidence must be LOW, MEDIUM or HIGH.
+6. needs_verification must normally be true.
+7. Only describe information that can reasonably
+   be determined from the visible package.
+8. Do not provide dosage recommendations.
+9. Do not recommend starting or stopping medication.
+10. Keep simple_explanation short and patient-friendly.
+"""
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": """
+Read the medicine package carefully.
+
+Identify only visible medicine information.
+If the medicine cannot be reliably identified,
+say so instead of guessing.
+
+Return JSON only.
+"""
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url":
+                                f"data:{file.content_type};base64,{encoded_image}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            temperature=0.1,
+            max_tokens=600,
+        )
+
+        content = response.choices[0].message.content
+
+        result = json.loads(
+            content.replace("```json", "")
+                   .replace("```", "")
+                   .strip()
+        )
+
+        return {
+            "success": True,
+            "data": result,
+        }
+
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=500,
+            detail="Vision AI returned invalid JSON."
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+
 @app.post("/vision-analyze")
 async def vision_analyze(
     file: UploadFile = File(...)

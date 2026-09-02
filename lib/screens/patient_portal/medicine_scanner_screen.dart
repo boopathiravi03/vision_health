@@ -39,7 +39,7 @@ class _MedicineScannerScreenState
       final request = http.MultipartRequest(
         'POST',
         Uri.parse(
-          'https://vision-health.onrender.com/vision-analyze',
+          'https://vision-health.onrender.com/medicine-analyze',
         ),
       );
 
@@ -63,7 +63,7 @@ class _MedicineScannerScreenState
       final decoded = jsonDecode(response.body);
 
       setState(() {
-        _result = decoded;
+        _result = decoded['data'] ?? decoded;
       });
     } catch (e) {
       if (!mounted) return;
@@ -247,16 +247,38 @@ class _MedicineScannerScreenState
   Widget _resultCard() {
     final result = _result ?? {};
 
-    final observation =
-        result['observation']?.toString() ??
-            'No clear information detected.';
+    final medicineName =
+        result['medicine_name']?.toString() ?? '';
 
-    final indicators =
-        result['visible_indicators'];
+    final strength =
+        result['strength']?.toString() ?? '';
 
-    final recommendation =
-        result['recommendation']?.toString() ??
-            'Please verify the medicine with a healthcare professional.';
+    final visibleText =
+        result['visible_text']?.toString() ?? '';
+
+    final medicineType =
+        result['medicine_type']?.toString() ?? '';
+
+    final appearsFor =
+        result['what_it_appears_to_be_for']?.toString() ??
+            '';
+
+    final instructions =
+        result['instructions_visible']?.toString() ?? '';
+
+    final confidence =
+        result['confidence']?.toString() ?? 'LOW';
+
+    final needsVerification =
+        result['needs_verification'] == true;
+
+    final explanation =
+        result['simple_explanation']?.toString() ??
+            'Please verify this medicine with a healthcare professional.';
+
+    final warning =
+        result['warning']?.toString() ??
+            'Confirm the medicine with an ASHA worker, doctor or pharmacist.';
 
     return Container(
       width: double.infinity,
@@ -294,78 +316,121 @@ class _MedicineScannerScreenState
 
           const SizedBox(height: 18),
 
-          const Text(
-            'What I can see',
-            style: TextStyle(
-              color: Colors.grey,
-              fontWeight: FontWeight.w600,
+          if (medicineName.isNotEmpty) ...[
+            _resultRow('Medicine', medicineName),
+            if (strength.isNotEmpty)
+              _resultRow('Strength', strength),
+            if (medicineType.isNotEmpty)
+              _resultRow('Type', medicineType),
+            if (appearsFor.isNotEmpty)
+              _resultRow('Appears to be for', appearsFor),
+            _resultRow('AI confidence', confidence),
+            const SizedBox(height: 4),
+            Text(
+              needsVerification
+                  ? 'Needs verification'
+                  : 'No verification needed',
+              style: TextStyle(
+                color: needsVerification
+                    ? Colors.orange
+                    : Colors.green,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-
-          const SizedBox(height: 6),
-
-          Text(
-            observation,
-            style: const TextStyle(
-              fontSize: 16,
-              height: 1.45,
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          if (indicators is List &&
-              indicators.isNotEmpty) ...[
+          ] else ...[
             const Text(
-              'Visible information',
+              'What AI can see',
               style: TextStyle(
                 color: Colors.grey,
                 fontWeight: FontWeight.w600,
               ),
             ),
-
-            const SizedBox(height: 8),
-
-            ...indicators.map(
-              (item) => Padding(
-                padding:
-                    const EdgeInsets.only(
-                  bottom: 6,
-                ),
-                child: Row(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    const Text('• '),
-                    Expanded(
-                      child: Text(
-                        item.toString(),
-                      ),
-                    ),
-                  ],
-                ),
+            const SizedBox(height: 6),
+            Text(
+              visibleText.isEmpty
+                  ? 'No clear medicine information detected.'
+                  : visibleText,
+              style: const TextStyle(
+                fontSize: 16,
+                height: 1.45,
               ),
             ),
-
-            const SizedBox(height: 12),
           ],
 
+          if (instructions.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'Visible instructions',
+              style: TextStyle(
+                color: Colors.grey,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(instructions),
+          ],
+
+          const SizedBox(height: 16),
+
           const Text(
-            'Next step',
+            'Simple explanation',
             style: TextStyle(
               color: Colors.grey,
               fontWeight: FontWeight.w600,
             ),
           ),
-
           const SizedBox(height: 6),
+          Text(explanation),
 
-          Text(
-            recommendation,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.45,
+          const SizedBox(height: 16),
+
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.amber.shade200,
+              ),
             ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.orange,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    warning,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _resultRow(String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$title: ',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          Expanded(
+            child: Text(value),
           ),
         ],
       ),
