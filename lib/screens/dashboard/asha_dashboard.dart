@@ -303,12 +303,14 @@ class _AshaDashboardState extends State<AshaDashboard> {
                   context,
                   icon: Icons.medical_services,
                   title: 'AI Triage',
-                  subtitle: 'Select a patient to assess risk and get next-step guidance.',
+                  subtitle: 'Assess patient risk and get the next recommended action.',
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const PatientListScreen(),
+                        builder: (_) => const PatientListScreen(
+                          action: PatientSelectionAction.triage,
+                        ),
                       ),
                     );
                   },
@@ -318,12 +320,14 @@ class _AshaDashboardState extends State<AshaDashboard> {
                   context,
                   icon: Icons.account_balance,
                   title: 'Government Schemes',
-                  subtitle: 'Select a patient to find relevant government health benefits.',
+                  subtitle: 'Find health benefits and government schemes for a patient.',
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const PatientListScreen(),
+                        builder: (_) => const PatientListScreen(
+                          action: PatientSelectionAction.schemes,
+                        ),
                       ),
                     );
                   },

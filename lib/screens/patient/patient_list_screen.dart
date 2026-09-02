@@ -4,8 +4,15 @@ import 'package:flutter/material.dart';
 import 'health_passport_screen.dart';
 import '../schemes/scheme_finder_screen.dart';
 
+enum PatientSelectionAction { triage, schemes }
+
 class PatientListScreen extends StatefulWidget {
-  const PatientListScreen({super.key});
+  final PatientSelectionAction? action;
+
+  const PatientListScreen({
+    super.key,
+    this.action,
+  });
 
   @override
   State<PatientListScreen> createState() => _PatientListScreenState();
@@ -219,12 +226,46 @@ class _PatientListScreenState extends State<PatientListScreen> {
         borderRadius: BorderRadius.circular(20),
 
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => HealthPassportScreen(patientId: patientId),
-            ),
-          );
+          if (widget.action == PatientSelectionAction.triage) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => HealthPassportScreen(
+                  patientId: patientId,
+                ),
+              ),
+            );
+          } else if (widget.action == PatientSelectionAction.schemes) {
+            final patientAge = int.tryParse(age) ?? 0;
+            final patientGender = gender;
+
+            String situation = '';
+            if (symptoms is List) {
+              situation = symptoms.map((e) => e.toString()).join(', ');
+            } else if (symptoms != null) {
+              situation = symptoms.toString();
+            }
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SchemeFinderScreen(
+                  age: patientAge,
+                  gender: patientGender,
+                  situation: situation,
+                ),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => HealthPassportScreen(
+                  patientId: patientId,
+                ),
+              ),
+            );
+          }
         },
 
         child: Padding(
@@ -358,57 +399,59 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
               const SizedBox(height: 14),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => HealthPassportScreen(
-                              patientId: patientId,
+              if (widget.action == null) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => HealthPassportScreen(
+                                patientId: patientId,
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.medical_services_outlined, size: 18),
-                      label: const Text('AI TRIAGE'),
+                          );
+                        },
+                        icon: const Icon(Icons.medical_services_outlined, size: 18),
+                        label: const Text('AI TRIAGE'),
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(width: 10),
+                    const SizedBox(width: 10),
 
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        final patientAge = int.tryParse(age) ?? 0;
-                        final patientGender = gender;
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          final patientAge = int.tryParse(age) ?? 0;
+                          final patientGender = gender;
 
-                        String situation = '';
-                        if (symptoms is List) {
-                          situation = symptoms.map((e) => e.toString()).join(', ');
-                        } else if (symptoms != null) {
-                          situation = symptoms.toString();
-                        }
+                          String situation = '';
+                          if (symptoms is List) {
+                            situation = symptoms.map((e) => e.toString()).join(', ');
+                          } else if (symptoms != null) {
+                            situation = symptoms.toString();
+                          }
 
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => SchemeFinderScreen(
-                              age: patientAge,
-                              gender: patientGender,
-                              situation: situation,
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => SchemeFinderScreen(
+                                age: patientAge,
+                                gender: patientGender,
+                                situation: situation,
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.account_balance, size: 18),
-                      label: const Text('SCHEMES'),
+                          );
+                        },
+                        icon: const Icon(Icons.account_balance, size: 18),
+                        label: const Text('SCHEMES'),
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
