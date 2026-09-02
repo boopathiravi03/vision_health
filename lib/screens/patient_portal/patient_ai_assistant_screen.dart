@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:flutter_tts/flutter_tts.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 class PatientAiAssistantScreen extends StatefulWidget {
   const PatientAiAssistantScreen({super.key});
@@ -15,39 +12,49 @@ class PatientAiAssistantScreen extends StatefulWidget {
 class _PatientAiAssistantScreenState
     extends State<PatientAiAssistantScreen> {
   final stt.SpeechToText _speech = stt.SpeechToText();
-  final FlutterTts _tts = FlutterTts();
 
   bool _listening = false;
-  bool _loading = false;
-
   String _question = '';
-  String _answer = '';
 
-  String _language = 'en-IN';
+  final List<Map<String, String>> _messages = [];
 
-  final Map<String, String> _languages = {
-    'en-IN': 'English',
-    'ta-IN': 'தமிழ்',
-    'hi-IN': 'हिन्दी',
-  };
+  Future<void> _toggleListening() async {
+    if (_listening) {
+      await _speech.stop();
 
-  Future<void> _startListening() async {
+      setState(() {
+        _listening = false;
+      });
+
+      if (_question.trim().isNotEmpty) {
+        _askAI();
+      }
+
+      return;
+    }
+
     final available = await _speech.initialize();
 
     if (!available) {
-      _showMessage('Speech recognition is not available.');
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Speech recognition is not available.'),
+        ),
+      );
+
       return;
     }
 
     setState(() {
       _listening = true;
       _question = '';
-      _answer = '';
     });
 
     await _speech.listen(
       listenOptions: stt.SpeechListenOptions(
-        localeId: _language,
+        localeId: 'en-IN',
       ),
       onResult: (result) {
         setState(() {
@@ -57,97 +64,30 @@ class _PatientAiAssistantScreenState
     );
   }
 
-  Future<void> _stopListening() async {
-    await _speech.stop();
+  void _askAI() {
+    final question = _question.trim();
+
+    if (question.isEmpty) return;
 
     setState(() {
-      _listening = false;
-    });
-
-    if (_question.trim().isNotEmpty) {
-      await _askAI();
-    }
-  }
-
-  Future<void> _askAI() async {
-    setState(() {
-      _loading = true;
-      _answer = '';
-    });
-
-    try {
-      final response = await http.post(
-        Uri.parse(
-          'https://vision-health.onrender.com/health-assistant',
-        ),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'query': _question,
-          'language': _language == 'ta-IN'
-              ? 'Tamil'
-              : _language == 'hi-IN'
-                  ? 'Hindi'
-                  : 'English',
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception(
-          'Server error: ${response.statusCode}',
-        );
-      }
-
-      final data = jsonDecode(response.body);
-
-      final answer =
-          data['response']?.toString() ??
-              'I could not understand the response.';
-
-      setState(() {
-        _answer = answer;
+      _messages.add({
+        'role': 'user',
+        'text': question,
       });
 
-      await _speak(answer);
-    } catch (e) {
-      _showMessage(
-        'Unable to connect to Vission Health AI.',
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
-  }
+      _messages.add({
+        'role': 'ai',
+        'text':
+            'I understand your question. Please follow the care instructions given by your healthcare worker. If you have severe or worsening symptoms, please contact your PHC or doctor.',
+      });
 
-  Future<void> _speak(String text) async {
-    if (_language == 'ta-IN') {
-      await _tts.setLanguage('ta-IN');
-    } else if (_language == 'hi-IN') {
-      await _tts.setLanguage('hi-IN');
-    } else {
-      await _tts.setLanguage('en-IN');
-    }
-
-    await _tts.setSpeechRate(0.45);
-    await _tts.speak(text);
-  }
-
-  void _showMessage(String message) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+      _question = '';
+    });
   }
 
   @override
   void dispose() {
     _speech.stop();
-    _tts.stop();
     super.dispose();
   }
 
@@ -155,302 +95,143 @@ class _PatientAiAssistantScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F9F8),
-
       appBar: AppBar(
         title: const Text('AI Health Assistant'),
       ),
-
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
-
-          children: [
-            _header(),
-
-            const SizedBox(height: 20),
-
-            _languageSelector(),
-
-            const SizedBox(height: 20),
-
-            _questionCard(),
-
-            const SizedBox(height: 20),
-
-            _micButton(),
-
-            const SizedBox(height: 25),
-
-            if (_loading)
-              const Center(
-                child: CircularProgressIndicator(),
-              ),
-
-            if (_answer.isNotEmpty && !_loading)
-              _answerCard(),
-
-            const SizedBox(height: 20),
-
-            _notice(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _header() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F6F3),
-        borderRadius: BorderRadius.circular(22),
-      ),
-
-      child: const Column(
+      body: Column(
         children: [
-          Icon(
-            Icons.record_voice_over_rounded,
-            size: 52,
-            color: Color(0xFF087F73),
-          ),
-
-          SizedBox(height: 12),
-
-          Text(
-            'Talk to Vission Health',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF073B36),
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F6F3),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Row(
+              children: [
+                CircleAvatar(
+                  radius: 25,
+                  backgroundColor: Colors.white,
+                  child: Icon(
+                    Icons.smart_toy,
+                    color: Color(0xFF087F73),
+                  ),
+                ),
+                SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    'Ask your health question by speaking naturally.',
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          SizedBox(height: 8),
+          Expanded(
+            child: _messages.isEmpty
+                ? const Center(
+                    child: Text(
+                      'Tap the microphone and ask a question.',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 15,
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                    ),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final message = _messages[index];
+                      final isUser = message['role'] == 'user';
 
-          Text(
-            'Ask your health question in your own language. '
-            'The assistant will answer and read the response aloud.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.black54,
-              height: 1.45,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _languageSelector() {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-      ),
-
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFE0E9E6),
-        ),
-      ),
-
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _language,
-          isExpanded: true,
-
-          items: _languages.entries.map(
-            (entry) {
-              return DropdownMenuItem<String>(
-                value: entry.key,
-                child: Text(entry.value),
-              );
-            },
-          ).toList(),
-
-          onChanged: (value) {
-            if (value == null) return;
-
-            setState(() {
-              _language = value;
-            });
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _questionCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
-
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-
-        children: [
-          const Text(
-            'Your question',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
+                      return Align(
+                        alignment: isUser
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          constraints: const BoxConstraints(
+                            maxWidth: 330,
+                          ),
+                          margin: const EdgeInsets.only(
+                            bottom: 12,
+                          ),
+                          padding: const EdgeInsets.all(15),
+                          decoration: BoxDecoration(
+                            color: isUser
+                                ? const Color(0xFF087F73)
+                                : Colors.white,
+                            borderRadius:
+                                BorderRadius.circular(18),
+                          ),
+                          child: Text(
+                            message['text'] ?? '',
+                            style: TextStyle(
+                              color: isUser
+                                  ? Colors.white
+                                  : Colors.black87,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
 
-          const SizedBox(height: 10),
-
-          Text(
-            _question.isEmpty
-                ? 'Tap the microphone and speak...'
-                : _question,
-            style: TextStyle(
-              fontSize: 16,
-              height: 1.5,
-              color: _question.isEmpty
-                  ? Colors.grey
-                  : Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _micButton() {
-    return Center(
-      child: GestureDetector(
-        onTap: _listening
-            ? _stopListening
-            : _startListening,
-
-        child: AnimatedContainer(
-          duration:
-              const Duration(milliseconds: 250),
-
-          width: 105,
-          height: 105,
-
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: _listening
-                ? Colors.red
-                : const Color(0xFF087F73),
-
-            boxShadow: [
-              BoxShadow(
-                blurRadius:
-                    _listening ? 25 : 12,
-                spreadRadius:
-                    _listening ? 5 : 2,
-                color: (_listening
-                        ? Colors.red
-                        : const Color(0xFF087F73))
-                    .withValues(alpha: 0.2),
+          if (_question.isNotEmpty)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(
+                horizontal: 16,
               ),
-            ],
-          ),
-
-          child: Icon(
-            _listening
-                ? Icons.stop
-                : Icons.mic,
-            color: Colors.white,
-            size: 45,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _answerCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFFE0E9E6),
-        ),
-      ),
-
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-
-        children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.volume_up_rounded,
-                color: Color(0xFF087F73),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
               ),
-              SizedBox(width: 8),
-              Text(
-                'Vission Health says',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              child: Text(
+                _question,
+                style: const TextStyle(
+                  fontSize: 15,
                 ),
               ),
-            ],
-          ),
+            ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          Text(
-            _answer,
-            style: const TextStyle(
-              fontSize: 16,
-              height: 1.55,
+          Padding(
+            padding: const EdgeInsets.only(
+              left: 20,
+              right: 20,
+              bottom: 25,
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              height: 58,
+              child: FilledButton.icon(
+                onPressed: _toggleListening,
+                icon: Icon(
+                  _listening
+                      ? Icons.stop
+                      : Icons.mic,
+                ),
+                label: Text(
+                  _listening
+                      ? 'STOP & ASK'
+                      : 'ASK BY VOICE',
+                ),
+              ),
             ),
           ),
-
-          const SizedBox(height: 14),
-
-          OutlinedButton.icon(
-            onPressed: () => _speak(_answer),
-            icon: const Icon(Icons.volume_up),
-            label: const Text('READ AGAIN'),
-          ),
         ],
-      ),
-    );
-  }
-
-  Widget _notice() {
-    return Container(
-      padding: const EdgeInsets.all(15),
-
-      decoration: BoxDecoration(
-        color: Colors.amber.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.amber.shade200,
-        ),
-      ),
-
-      child: const Text(
-        'Vission Health provides general health guidance. '
-        'It does not replace a doctor or emergency medical care.',
-        style: TextStyle(
-          fontSize: 12,
-          height: 1.45,
-        ),
       ),
     );
   }
