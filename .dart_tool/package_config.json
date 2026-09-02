@@ -212,6 +212,12 @@
       "languageVersion": "3.8"
     },
     {
+      "name": "flutter_markdown",
+      "rootUri": "file:///C:/Users/boopa/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_markdown-0.7.7+1",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
       "name": "flutter_plugin_android_lifecycle",
       "rootUri": "file:///C:/Users/boopa/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.35",
       "packageUri": "lib/",
@@ -384,6 +390,12 @@
       "rootUri": "file:///C:/Users/boopa/AppData/Local/Pub/Cache/hosted/pub.dev/lucide_icons-0.257.0",
       "packageUri": "lib/",
       "languageVersion": "2.12"
+    },
+    {
+      "name": "markdown",
+      "rootUri": "file:///C:/Users/boopa/AppData/Local/Pub/Cache/hosted/pub.dev/markdown-7.3.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.9"
     },
     {
       "name": "matcher",
