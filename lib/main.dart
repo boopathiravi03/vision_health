@@ -4,7 +4,6 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 import 'screens/splash/splash_screen.dart';
-import 'screens/auth/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +23,6 @@ class VissionHealthApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Vission Health',
-
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF087F73),
@@ -33,13 +31,7 @@ class VissionHealthApp extends StatelessWidget {
         textTheme: GoogleFonts.interTextTheme(),
         useMaterial3: true,
       ),
-
       home: const SplashScreen(),
-
-      routes: {
-        '/login': (_) => const LoginScreen(),
-        '/splash': (_) => const SplashScreen(),
-      },
     );
   }
 }

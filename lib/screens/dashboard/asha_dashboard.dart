@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/patient.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/patient_service.dart';
+import '../splash/splash_screen.dart';
 import '../patients/patient_details_screen.dart';
 import '../patient/patient_list_screen.dart';
 import '../voice/voice_to_form_screen.dart';
@@ -34,9 +35,11 @@ class _AshaDashboardState extends State<AshaDashboard> {
 
     if (!mounted) return;
 
-    Navigator.pushNamedAndRemoveUntil(
+    Navigator.pushAndRemoveUntil(
       context,
-      '/splash',
+      MaterialPageRoute(
+        builder: (_) => const RoleSelectionScreen(),
+      ),
       (route) => false,
     );
   }
