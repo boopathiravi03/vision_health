@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'patient_ai_voice_screen.dart';
+
 class PatientPortalScreen extends StatelessWidget {
   const PatientPortalScreen({super.key});
 
@@ -40,10 +42,12 @@ class PatientPortalScreen extends StatelessWidget {
                   'Speak in your language and get simple health guidance.',
               color: const Color(0xFF087F73),
               onTap: () {
-                _showComingSoon(
+                Navigator.push(
                   context,
-                  'Vission AI',
-                  'Voice health assistant will be available here.',
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const PatientAiVoiceScreen(),
+                  ),
                 );
               },
             ),
