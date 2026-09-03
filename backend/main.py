@@ -405,26 +405,58 @@ Important:
 - Do not give medical diagnosis.
 """
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {
-                "role": "system",
-                "content": prompt,
-            },
-            {
-                "role": "user",
-                "content": data.situation,
-            },
-        ],
-        temperature=0.1,
-    )
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": prompt,
+                },
+                {
+                    "role": "user",
+                    "content": data.situation,
+                },
+            ],
+            temperature=0.1,
+        )
 
-    content = response.choices[0].message.content
+        content = response.choices[0].message.content
 
-    result = json.loads(content)
+        if content is None:
+            raise HTTPException(
+                status_code=500,
+                detail="AI returned empty content.",
+            )
 
-    return result
+        cleaned = content.replace("```json", "").replace("```", "").strip()
+
+        try:
+            result = json.loads(cleaned)
+        except json.JSONDecodeError:
+            result = {
+                "schemes": [
+                    {
+                        "name": "Verification needed",
+                        "description": cleaned,
+                        "why_eligible": "The AI response could not be parsed automatically.",
+                        "documents": [],
+                        "where_to_apply": "Please verify with your local PHC or health worker.",
+                        "action": "Consult your ASHA worker or PHC for confirmed scheme details.",
+                    }
+                ]
+            }
+
+        return result
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
 
 
 @app.post("/medicine-analyze")
