@@ -89,7 +89,7 @@ Rules:
 
     try:
         response = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {
                     "role": "system",
@@ -184,7 +184,7 @@ ASHA transcript:
 
     try:
         response = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {
                     "role": "system",
@@ -272,7 +272,7 @@ Keep the explanation concise.
 """
 
         response = client.chat.completions.create(
-            model="openai/gpt-oss-20b",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {
                     "role": "system",
@@ -319,15 +319,15 @@ async def health_assistant(data: HealthQuery):
 
     prompt = f"""
 You are Vission Health, an AI assistant designed
-to support ASHA workers in rural India.
+to support ASHA workers and patients in rural India.
 
-Patient/ASHA query:
+User query:
 {data.query}
 
 Requested language:
 {data.language}
 
-Provide practical health guidance for an ASHA worker.
+Provide practical health guidance.
 
 Rules:
 1. Do not diagnose.
@@ -338,10 +338,11 @@ Rules:
 6. Use simple language.
 7. Respond in the requested language.
 8. If the situation appears urgent, clearly say so.
+9. If symptoms are mild, explain simple self-care and when to seek help.
 """
 
     response = client.chat.completions.create(
-        model="openai/gpt-oss-120b",
+        model="llama-3.3-70b-versatile",
         messages=[
             {
                 "role": "system",
@@ -405,7 +406,7 @@ Important:
 """
 
     response = client.chat.completions.create(
-        model="openai/gpt-oss-120b",
+        model="llama-3.3-70b-versatile",
         messages=[
             {
                 "role": "system",
