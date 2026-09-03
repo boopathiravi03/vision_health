@@ -11,6 +11,7 @@ class SchemeFinderScreen extends StatefulWidget {
   final String gender;
   final String situation;
   final String village;
+  final String patientId;
 
   const SchemeFinderScreen({
     super.key,
@@ -19,6 +20,7 @@ class SchemeFinderScreen extends StatefulWidget {
     this.gender = 'Male',
     this.situation = 'Fever',
     this.village = 'Chennai',
+    this.patientId = '',
   });
 
   @override
@@ -440,7 +442,7 @@ class _SchemeFinderScreenState extends State<SchemeFinderScreen> {
                   MaterialPageRoute(
                     builder: (_) => SchemeHospitalMapScreen(
                       scheme: scheme,
-                      patientLocation: patientVillage,
+                      patientId: widget.patientId,
                     ),
                   ),
                 );
