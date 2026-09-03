@@ -3,16 +3,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'patient_ai_assistant_screen.dart';
 import 'patient_ai_scanner_screen.dart';
-import 'patient_benefits_screen.dart';
+import 'government_benefits_screen.dart';
 import 'medicine_scanner_screen.dart';
 import 'nearby_phc_screen.dart';
 import 'patient_care_instructions_screen.dart';
 import 'patient_health_records_screen.dart';
 import '../patient/health_passport_screen.dart';
+import '../qr/qr_scanner_screen.dart';
 import '../../services/auth_service.dart';
 import '../../services/patient_service.dart';
 
-class PatientPortalScreen extends StatelessWidget {
+class PatientPortalScreen extends StatefulWidget {
   final String patientId;
   final String patientName;
 
@@ -23,21 +24,33 @@ class PatientPortalScreen extends StatelessWidget {
   });
 
   @override
+  State<PatientPortalScreen> createState() => _PatientPortalScreenState();
+}
+
+class _PatientPortalScreenState extends State<PatientPortalScreen> {
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F9F8),
       appBar: AppBar(
         title: Text(
-          '$patientName\'s Portal',
+          '${widget.patientName}\'s Portal',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            icon: const Icon(Icons.logout_rounded),
+            onPressed: () => _signOut(context),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _welcomeCard(patientName),
+            _welcomeCard(widget.patientName),
 
             const SizedBox(height: 24),
 
@@ -100,7 +113,7 @@ class PatientPortalScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => HealthPassportScreen(patientId: patientId),
+                    builder: (_) => HealthPassportScreen(patientId: widget.patientId),
                   ),
                 );
               },
@@ -118,7 +131,7 @@ class PatientPortalScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (_) =>
-                        PatientHealthRecordsScreen(patientId: patientId),
+                        PatientHealthRecordsScreen(patientId: widget.patientId),
                   ),
                 );
               },
@@ -136,7 +149,7 @@ class PatientPortalScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (_) =>
-                        PatientCareInstructionsScreen(patientId: patientId),
+                        PatientCareInstructionsScreen(patientId: widget.patientId),
                   ),
                 );
               },
@@ -161,7 +174,7 @@ class PatientPortalScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => PatientBenefitsScreen(patientId: patientId),
+                    builder: (_) => const GovernmentBenefitsScreen(),
                   ),
                 );
               },
@@ -194,7 +207,9 @@ class PatientPortalScreen extends StatelessWidget {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const NearbyPhcScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => NearbyPhcScreen(patientId: widget.patientId),
+                  ),
                 );
               },
             ),
@@ -340,6 +355,17 @@ class PatientPortalScreen extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _signOut(BuildContext context) async {
+    await FirebaseAuth.instance.signOut();
+
+    if (!context.mounted) return;
+
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      '/login',
+      (route) => false,
+    );
+  }
 }
 
 class PatientPortalAccessScreen extends StatefulWidget {
@@ -410,6 +436,56 @@ class _PatientPortalAccessScreenState extends State<PatientPortalAccessScreen> {
             error.code == 'invalid-credential'
                 ? 'Invalid email or password.'
                 : 'Unable to sign in. Please try again.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open the patient record.')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _scanQrToLogin() async {
+    if (_loading) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => QrScannerScreen(
+          onScanned: (patientId) async {
+            if (!mounted) return;
+            Navigator.pop(context);
+            await _openPortalWithPatientId(patientId);
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openPortalWithPatientId(String patientId) async {
+    setState(() => _loading = true);
+    try {
+      final patient = await _patientService.getPatient(patientId);
+      if (!mounted) return;
+      if (patient == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No patient record found for this QR code.'),
+          ),
+        );
+        return;
+      }
+      final name = patient['name']?.toString().trim();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PatientPortalScreen(
+            patientId: patientId,
+            patientName: name?.isNotEmpty == true ? name! : 'Patient',
           ),
         ),
       );
@@ -496,6 +572,15 @@ class _PatientPortalAccessScreenState extends State<PatientPortalAccessScreen> {
                   child: FilledButton(
                     onPressed: _loading ? null : _openPortal,
                     child: Text(_loading ? 'SIGNING IN...' : 'LOGIN'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _loading ? null : _scanQrToLogin,
+                    icon: const Icon(Icons.qr_code_scanner_outlined),
+                    label: const Text('SCAN QR TO LOGIN'),
                   ),
                 ),
               ],

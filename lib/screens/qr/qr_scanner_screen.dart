@@ -4,7 +4,9 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../patient/health_passport_screen.dart';
 
 class QrScannerScreen extends StatefulWidget {
-  const QrScannerScreen({super.key});
+  final void Function(String patientId)? onScanned;
+
+  const QrScannerScreen({super.key, this.onScanned});
 
   @override
   State<QrScannerScreen> createState() =>
@@ -32,6 +34,11 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           }
 
           scanned = true;
+
+          if (widget.onScanned != null) {
+            widget.onScanned!(patientId);
+            return;
+          }
 
           Navigator.pushReplacement(
             context,
