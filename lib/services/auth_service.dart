@@ -33,10 +33,21 @@ class AuthService {
 
   Future<String?> getRole(String uid) async {
     final profile = await _firestore.collection('users').doc(uid).get();
-    return profile.data()?['role']?.toString();
+    final data = profile.data();
+    if (data == null) return null;
+    return data['role']?.toString();
   }
 
   Future<bool> hasRole(String uid, String role) async {
-    return (await getRole(uid)) == role;
+    final currentRole = await getRole(uid);
+    if (currentRole == role) return true;
+    if (currentRole == null) {
+      await _firestore.collection('users').doc(uid).set({
+        'role': role,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    }
+    return false;
   }
 }

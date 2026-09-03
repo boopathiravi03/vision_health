@@ -66,7 +66,28 @@ class PatientService {
         .limit(1)
         .get();
 
-    if (snapshot.docs.isEmpty) return null;
+    if (snapshot.docs.isEmpty) {
+      final user = _auth.currentUser;
+      final email = user?.email ?? '';
+      final name = email.split('@').first;
+      final docRef = await _firestore.collection('patients').add({
+        'name': name,
+        'age': 0,
+        'gender': '',
+        'village': '',
+        'phone': '',
+        'symptoms': '',
+        'status': 'Pending',
+        'followUpDate': '',
+        'riskLevel': 'Routine',
+        'aiRecommendation': '',
+        'patientAuthUid': authUid,
+        'createdBy': authUid,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      final docSnapshot = await docRef.get();
+      return {'id': docRef.id, ...docSnapshot.data()!};
+    }
 
     final document = snapshot.docs.first;
     return {'id': document.id, ...document.data()};
