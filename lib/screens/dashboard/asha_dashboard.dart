@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../models/patient.dart';
@@ -21,12 +20,9 @@ class AshaDashboard extends StatefulWidget {
 }
 
 class _AshaDashboardState extends State<AshaDashboard> {
-  final PatientService _patientService =
-      PatientService();
+  final PatientService _patientService = PatientService();
 
-  final ConnectivityService
-      _connectivityService =
-      ConnectivityService();
+  final ConnectivityService _connectivityService = ConnectivityService();
 
   bool _isOnline = true;
 
@@ -37,103 +33,52 @@ class _AshaDashboardState extends State<AshaDashboard> {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(
-        builder: (_) => const RoleSelectionScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
       (route) => false,
     );
   }
 
   Future<void> createDemoPatient() async {
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('patients')
-          .add({
-        'name': 'Ramesh Kumar',
-        'age': 45,
-        'gender': 'Male',
-        'village': 'Kovilur',
-        'phone': '',
-        'symptoms':
-            'Fever, Cough, Weakness',
-        'status': 'confirmed',
-        'followUpDate': DateTime.now()
-                .add(const Duration(days: 1))
-                .toIso8601String()
-                .split('T')
-                .first,
-        'riskLevel': 'Follow-up',
-        'aiRecommendation':
-            'ASHA worker should monitor the patient and arrange a health-facility evaluation if symptoms persist or worsen.',
-      });
+      final patientId = await _patientService.addPatient(
+        Patient(
+          id: '',
+          name: 'Ramesh Kumar',
+          age: 45,
+          gender: 'Male',
+          village: 'Kovilur',
+          phone: '',
+          symptoms: 'Fever, Cough, Weakness',
+          status: 'confirmed',
+          followUpDate: DateTime.now()
+              .add(const Duration(days: 1))
+              .toIso8601String()
+              .split('T')
+              .first,
+          riskLevel: 'Follow-up',
+          aiRecommendation:
+              'ASHA worker should monitor the patient and arrange a health-facility evaluation if symptoms persist or worsen.',
+        ),
+      );
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Demo patient created successfully',
-          ),
-        ),
+        const SnackBar(content: Text('Demo patient record created.')),
       );
 
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => HealthPassportScreen(
-            patientId: doc.id,
-          ),
+          builder: (_) => HealthPassportScreen(patientId: patientId),
         ),
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Demo patient failed: $e',
-          ),
-        ),
-      );
-    }
-  }
-
-  Future<void> _seedDemoIfEmpty() async {
-    try {
-      final patients =
-          await _patientService
-              .getPatients()
-              .first;
-
-      if (patients.isEmpty &&
-          mounted) {
-        await FirebaseFirestore.instance
-            .collection('patients')
-            .add({
-          'name': 'Ramesh Kumar',
-          'age': 45,
-          'gender': 'Male',
-          'village': 'Kovilur',
-          'phone': '',
-          'symptoms':
-              'Fever, Cough, Weakness',
-          'status': 'confirmed',
-          'followUpDate': DateTime.now()
-                  .add(
-                    const Duration(
-                      days: 1,
-                    ),
-                  )
-                  .toIso8601String()
-                  .split('T')
-                  .first,
-          'riskLevel': 'Follow-up',
-          'aiRecommendation':
-              'ASHA worker should monitor the patient and arrange a health-facility evaluation if symptoms persist or worsen.',
-        });
-      }
-    } catch (_) {
-      // ignore demo seed failures
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Demo patient setup failed: $e')));
     }
   }
 
@@ -148,7 +93,6 @@ class _AshaDashboardState extends State<AshaDashboard> {
         });
       }
     });
-    _seedDemoIfEmpty();
   }
 
   Future<void> _checkConnectivity() async {
@@ -168,16 +112,12 @@ class _AshaDashboardState extends State<AshaDashboard> {
       appBar: AppBar(
         title: const Text(
           'Vission Health',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
             onPressed: () {},
-            icon: const Icon(
-              Icons.notifications_outlined,
-            ),
+            icon: const Icon(Icons.notifications_outlined),
           ),
           IconButton(
             onPressed: signOut,
@@ -191,11 +131,8 @@ class _AshaDashboardState extends State<AshaDashboard> {
         stream: _patientService.getPatients(),
 
         builder: (context, snapshot) {
-          if (snapshot.connectionState ==
-              ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
           }
 
           if (snapshot.hasError) {
@@ -207,38 +144,25 @@ class _AshaDashboardState extends State<AshaDashboard> {
             );
           }
 
-          final patients =
-              snapshot.data ?? [];
+          final patients = snapshot.data ?? [];
 
-          final total =
-              patients.length;
+          final total = patients.length;
 
-          final urgent =
-              patients.where(
-            (p) => p.riskLevel
-                .toLowerCase() ==
-                'urgent',
-          ).length;
+          final urgent = patients
+              .where((p) => p.riskLevel.toLowerCase() == 'urgent')
+              .length;
 
-          final followUp =
-              patients.where(
-            (p) => p.riskLevel
-                .toLowerCase() ==
-                'follow-up',
-          ).length;
+          final followUp = patients
+              .where((p) => p.riskLevel.toLowerCase() == 'follow-up')
+              .length;
 
           return RefreshIndicator(
             onRefresh: () async {
-              await Future.delayed(
-                const Duration(
-                  milliseconds: 500,
-                ),
-              );
+              await Future.delayed(const Duration(milliseconds: 500));
             },
 
             child: ListView(
-              padding:
-                  const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(18),
 
               children: [
                 if (!_isOnline)
@@ -251,18 +175,12 @@ class _AshaDashboardState extends State<AshaDashboard> {
                     color: Colors.orange.withValues(alpha: .12),
                     child: const Row(
                       children: [
-                        Icon(
-                          Icons.cloud_off,
-                          size: 20,
-                          color: Colors.orange,
-                        ),
+                        Icon(Icons.cloud_off, size: 20, color: Colors.orange),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Offline mode — patient records will sync automatically when internet returns.',
-                            style: TextStyle(
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(fontSize: 12),
                           ),
                         ),
                       ],
@@ -273,17 +191,11 @@ class _AshaDashboardState extends State<AshaDashboard> {
 
                 const SizedBox(height: 20),
 
-                _stats(
-                  total: total,
-                  followUp: followUp,
-                  urgent: urgent,
-                ),
+                _stats(total: total, followUp: followUp, urgent: urgent),
 
                 const SizedBox(height: 26),
 
-                _sectionTitle(
-                  'Quick Actions',
-                ),
+                _sectionTitle('Quick Actions'),
 
                 const SizedBox(height: 12),
 
@@ -293,9 +205,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
 
                 const SizedBox(height: 26),
 
-                _sectionTitle(
-                  'Tools',
-                ),
+                _sectionTitle('Tools'),
 
                 const SizedBox(height: 12),
 
@@ -303,7 +213,8 @@ class _AshaDashboardState extends State<AshaDashboard> {
                   context,
                   icon: Icons.medical_services,
                   title: 'AI Triage',
-                  subtitle: 'Assess patient risk and get the next recommended action.',
+                  subtitle:
+                      'Assess patient risk and get the next recommended action.',
                   onTap: () {
                     Navigator.push(
                       context,
@@ -320,7 +231,8 @@ class _AshaDashboardState extends State<AshaDashboard> {
                   context,
                   icon: Icons.account_balance,
                   title: 'Government Schemes',
-                  subtitle: 'Find health benefits and government schemes for a patient.',
+                  subtitle:
+                      'Find health benefits and government schemes for a patient.',
                   onTap: () {
                     Navigator.push(
                       context,
@@ -337,14 +249,12 @@ class _AshaDashboardState extends State<AshaDashboard> {
                   context,
                   icon: Icons.smart_toy,
                   title: 'Health Assistant',
-                  subtitle:
-                      'Ask general health guidance questions.',
+                  subtitle: 'Ask general health guidance questions.',
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            const HealthAssistantScreen(),
+                        builder: (_) => const HealthAssistantScreen(),
                       ),
                     );
                   },
@@ -354,14 +264,12 @@ class _AshaDashboardState extends State<AshaDashboard> {
                   context,
                   icon: Icons.people_outline,
                   title: 'Patients',
-                  subtitle:
-                      'View, search and manage all patient records.',
+                  subtitle: 'View, search and manage all patient records.',
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            const PatientListScreen(),
+                        builder: (_) => const PatientListScreen(),
                       ),
                     );
                   },
@@ -369,23 +277,15 @@ class _AshaDashboardState extends State<AshaDashboard> {
 
                 const SizedBox(height: 26),
 
-                _attentionList(
-                  context,
-                  patients,
-                ),
+                _attentionList(context, patients),
 
                 const SizedBox(height: 26),
 
-                _sectionTitle(
-                  'Recent Patients',
-                ),
+                _sectionTitle('Recent Patients'),
 
                 const SizedBox(height: 12),
 
-                _recentPatients(
-                  context,
-                  patients,
-                ),
+                _recentPatients(context, patients),
               ],
             ),
           );
@@ -396,27 +296,20 @@ class _AshaDashboardState extends State<AshaDashboard> {
 
   Widget _welcomeSection() {
     return Container(
-      padding:
-          const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
 
       decoration: BoxDecoration(
-        color:
-            const Color(0xFFE8F6F3),
-        borderRadius:
-            BorderRadius.circular(20),
+        color: const Color(0xFFE8F6F3),
+        borderRadius: BorderRadius.circular(20),
       ),
 
       child: const Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
           Text(
             'Good morning 👋',
-            style: TextStyle(
-              fontSize: 15,
-              color: Colors.black54,
-            ),
+            style: TextStyle(fontSize: 15, color: Colors.black54),
           ),
 
           SizedBox(height: 4),
@@ -425,10 +318,8 @@ class _AshaDashboardState extends State<AshaDashboard> {
             'ASHA Worker',
             style: TextStyle(
               fontSize: 25,
-              fontWeight:
-                  FontWeight.bold,
-              color:
-                  Color(0xFF087F73),
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF087F73),
             ),
           ),
 
@@ -436,9 +327,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
 
           Text(
             'Manage patients, follow-ups and health services from one place.',
-            style: TextStyle(
-              height: 1.4,
-            ),
+            style: TextStyle(height: 1.4),
           ),
         ],
       ),
@@ -489,47 +378,28 @@ class _AshaDashboardState extends State<AshaDashboard> {
     required String label,
   }) {
     return Container(
-      padding:
-          const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(14),
 
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(16),
-        border: Border.all(
-          color:
-              const Color(0xFFE0E9E6),
-        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE0E9E6)),
       ),
 
       child: Column(
         children: [
-          Icon(
-            icon,
-            color:
-                const Color(0xFF087F73),
-          ),
+          Icon(icon, color: const Color(0xFF087F73)),
 
           const SizedBox(height: 8),
 
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight:
-                  FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 2),
 
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Colors.grey,
-            ),
-          ),
+          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
         ],
       ),
     );
@@ -538,33 +408,20 @@ class _AshaDashboardState extends State<AshaDashboard> {
   Widget _sectionTitle(String title) {
     return Text(
       title,
-      style: const TextStyle(
-        fontSize: 19,
-        fontWeight: FontWeight.bold,
-      ),
+      style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
     );
   }
 
-  Widget _quickActions(
-    BuildContext context,
-  ) {
+  Widget _quickActions(BuildContext context) {
     return Row(
       children: [
         Expanded(
-          child: _actionCard(
-            context,
-            Icons.mic,
-            'Voice-to-Form',
-            () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const VoiceToFormScreen(),
-                ),
-              );
-            },
-          ),
+          child: _actionCard(context, Icons.mic, 'Voice-to-Form', () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const VoiceToFormScreen()),
+            );
+          }),
         ),
 
         const SizedBox(width: 12),
@@ -577,10 +434,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
             () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const QrScannerScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const QrScannerScreen()),
               );
             },
           ),
@@ -607,44 +461,29 @@ class _AshaDashboardState extends State<AshaDashboard> {
     VoidCallback onTap,
   ) {
     return InkWell(
-      borderRadius:
-          BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(16),
 
       onTap: onTap,
 
       child: Container(
-        padding:
-            const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(18),
 
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius:
-              BorderRadius.circular(16),
-          border: Border.all(
-            color:
-                const Color(0xFFE0E9E6),
-          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE0E9E6)),
         ),
 
         child: Column(
           children: [
-            Icon(
-              icon,
-              size: 30,
-              color:
-                  const Color(0xFF087F73),
-            ),
+            Icon(icon, size: 30, color: const Color(0xFF087F73)),
 
             const SizedBox(height: 8),
 
             Text(
               title,
-              textAlign:
-                  TextAlign.center,
-              style: const TextStyle(
-                fontWeight:
-                    FontWeight.w600,
-              ),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -676,22 +515,16 @@ class _AshaDashboardState extends State<AshaDashboard> {
                   height: 52,
                   decoration: BoxDecoration(
                     color: const Color(0xFFE8F6F3),
-                    borderRadius:
-                        BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(15),
                   ),
-                  child: Icon(
-                    icon,
-                    color: const Color(0xFF087F73),
-                    size: 28,
-                  ),
+                  child: Icon(icon, color: const Color(0xFF087F73), size: 28),
                 ),
 
                 const SizedBox(width: 15),
 
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         title,
@@ -726,160 +559,97 @@ class _AshaDashboardState extends State<AshaDashboard> {
     );
   }
 
-  Widget _attentionList(
-    BuildContext context,
-    List<Patient> patients,
-  ) {
-    final attention =
-        patients.where(
-      (patient) =>
-          patient.riskLevel
-              .toLowerCase() ==
-              'urgent' ||
-          patient.riskLevel
-              .toLowerCase() ==
-              'follow-up',
-    ).toList();
+  Widget _attentionList(BuildContext context, List<Patient> patients) {
+    final attention = patients
+        .where(
+          (patient) =>
+              patient.riskLevel.toLowerCase() == 'urgent' ||
+              patient.riskLevel.toLowerCase() == 'follow-up',
+        )
+        .toList();
 
     if (attention.isEmpty) {
-      return _emptyCard(
-        'No patients currently need attention.',
-      );
+      return _emptyCard('No patients currently need attention.');
     }
 
     final items = attention.take(5).toList();
 
     return Column(
-      children: List.generate(
-        items.length,
-        (index) {
-          final patient = items[index];
-          return _attentionCard(
-            context,
-            patient,
-          );
-        },
-      ),
+      children: List.generate(items.length, (index) {
+        final patient = items[index];
+        return _attentionCard(context, patient);
+      }),
     );
   }
 
-  Widget _attentionCard(
-    BuildContext context,
-    Patient patient,
-  ) {
+  Widget _attentionCard(BuildContext context, Patient patient) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                PatientDetailsScreen(
-              patient: patient,
-            ),
+            builder: (_) => PatientDetailsScreen(patient: patient),
           ),
         );
       },
-      child: _patientCard(
-        patient,
-        showRisk: true,
-      ),
+      child: _patientCard(patient, showRisk: true),
     );
   }
 
-  Widget _recentPatients(
-    BuildContext context,
-    List<Patient> patients,
-  ) {
+  Widget _recentPatients(BuildContext context, List<Patient> patients) {
     if (patients.isEmpty) {
-      return _emptyCard(
-        'No patient records yet.',
-      );
+      return _emptyCard('No patient records yet.');
     }
 
     final items = patients.take(5).toList();
 
     return Column(
-      children: List.generate(
-        items.length,
-        (index) {
-          final patient = items[index];
-          return _recentCard(
-            context,
-            patient,
-          );
-        },
-      ),
+      children: List.generate(items.length, (index) {
+        final patient = items[index];
+        return _recentCard(context, patient);
+      }),
     );
   }
 
-  Widget _recentCard(
-    BuildContext context,
-    Patient patient,
-  ) {
+  Widget _recentCard(BuildContext context, Patient patient) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                PatientDetailsScreen(
-              patient: patient,
-            ),
+            builder: (_) => PatientDetailsScreen(patient: patient),
           ),
         );
       },
-      child: _patientCard(
-        patient,
-      ),
+      child: _patientCard(patient),
     );
   }
 
-  Widget _patientCard(
-    Patient patient, {
-    bool showRisk = false,
-  }) {
-    final isUrgent =
-        patient.riskLevel
-            .toLowerCase() ==
-            'urgent';
+  Widget _patientCard(Patient patient, {bool showRisk = false}) {
+    final isUrgent = patient.riskLevel.toLowerCase() == 'urgent';
 
     return Container(
-      margin:
-          const EdgeInsets.only(
-        bottom: 10,
-      ),
+      margin: const EdgeInsets.only(bottom: 10),
 
-      padding:
-          const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(15),
 
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(15),
-        border: Border.all(
-          color:
-              const Color(0xFFE0E9E6),
-        ),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: const Color(0xFFE0E9E6)),
       ),
 
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor:
-                const Color(0xFFE8F6F3),
+            backgroundColor: const Color(0xFFE8F6F3),
 
             child: Text(
-              patient.name.isNotEmpty
-                  ? patient.name[0]
-                      .toUpperCase()
-                  : '?',
+              patient.name.isNotEmpty ? patient.name[0].toUpperCase() : '?',
 
-              style:
-                  const TextStyle(
-                color:
-                    Color(0xFF087F73),
-                fontWeight:
-                    FontWeight.bold,
+              style: const TextStyle(
+                color: Color(0xFF087F73),
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
@@ -888,16 +658,13 @@ class _AshaDashboardState extends State<AshaDashboard> {
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
 
               children: [
                 Text(
                   patient.name,
-                  style:
-                      const TextStyle(
-                    fontWeight:
-                        FontWeight.bold,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
                 ),
@@ -906,11 +673,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
 
                 Text(
                   '${patient.age} years • ${patient.village}',
-                  style:
-                      const TextStyle(
-                    color: Colors.grey,
-                    fontSize: 12,
-                  ),
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
 
                 const SizedBox(height: 4),
@@ -918,12 +681,8 @@ class _AshaDashboardState extends State<AshaDashboard> {
                 Text(
                   patient.symptoms,
                   maxLines: 1,
-                  overflow:
-                      TextOverflow.ellipsis,
-                  style:
-                      const TextStyle(
-                    fontSize: 12,
-                  ),
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
                 ),
               ],
             ),
@@ -931,34 +690,22 @@ class _AshaDashboardState extends State<AshaDashboard> {
 
           if (showRisk)
             Container(
-              padding:
-                  const EdgeInsets.symmetric(
-                horizontal: 9,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
 
               decoration: BoxDecoration(
                 color: isUrgent
-                    ? Colors.red
-                        .withValues(alpha: .1)
-                    : Colors.orange
-                        .withValues(alpha: .1),
+                    ? Colors.red.withValues(alpha: .1)
+                    : Colors.orange.withValues(alpha: .1),
 
-                borderRadius:
-                    BorderRadius.circular(
-                  10,
-                ),
+                borderRadius: BorderRadius.circular(10),
               ),
 
               child: Text(
                 patient.riskLevel,
                 style: TextStyle(
                   fontSize: 11,
-                  fontWeight:
-                      FontWeight.bold,
-                  color: isUrgent
-                      ? Colors.red
-                      : Colors.orange,
+                  fontWeight: FontWeight.bold,
+                  color: isUrgent ? Colors.red : Colors.orange,
                 ),
               ),
             ),
@@ -970,25 +717,18 @@ class _AshaDashboardState extends State<AshaDashboard> {
   Widget _emptyCard(String message) {
     return Container(
       width: double.infinity,
-      padding:
-          const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
 
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(16),
-        border: Border.all(
-          color:
-              const Color(0xFFE0E9E6),
-        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE0E9E6)),
       ),
 
       child: Text(
         message,
         textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.grey,
-        ),
+        style: const TextStyle(color: Colors.grey),
       ),
     );
   }

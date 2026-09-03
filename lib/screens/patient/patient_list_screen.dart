@@ -1,14 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'health_passport_screen.dart';
 import '../schemes/scheme_finder_screen.dart';
 
-enum PatientSelectionAction {
-  none,
-  triage,
-  schemes,
-}
+enum PatientSelectionAction { none, triage, schemes }
 
 class PatientListScreen extends StatefulWidget {
   final PatientSelectionAction action;
@@ -132,6 +129,10 @@ class _PatientListScreenState extends State<PatientListScreen> {
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
                   .collection('patients')
+                  .where(
+                    'createdBy',
+                    isEqualTo: FirebaseAuth.instance.currentUser?.uid,
+                  )
                   .snapshots(),
 
               builder: (context, snapshot) {
@@ -211,8 +212,8 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
     final severity =
         data['severity']?.toString() ??
-            data['riskLevel']?.toString() ??
-            'Not assessed';
+        data['riskLevel']?.toString() ??
+        'Not assessed';
 
     String symptomText = 'No symptoms recorded';
 
@@ -239,9 +240,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => HealthPassportScreen(
-                  patientId: patientId,
-                ),
+                builder: (_) => HealthPassportScreen(patientId: patientId),
               ),
             );
           } else if (widget.action == PatientSelectionAction.schemes) {
@@ -269,9 +268,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => HealthPassportScreen(
-                  patientId: patientId,
-                ),
+                builder: (_) => HealthPassportScreen(patientId: patientId),
               ),
             );
           }
@@ -417,13 +414,15 @@ class _PatientListScreenState extends State<PatientListScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => HealthPassportScreen(
-                                patientId: patientId,
-                              ),
+                              builder: (_) =>
+                                  HealthPassportScreen(patientId: patientId),
                             ),
                           );
                         },
-                        icon: const Icon(Icons.medical_services_outlined, size: 18),
+                        icon: const Icon(
+                          Icons.medical_services_outlined,
+                          size: 18,
+                        ),
                         label: const Text('AI TRIAGE'),
                       ),
                     ),
@@ -438,7 +437,9 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
                           String situation = '';
                           if (symptoms is List) {
-                            situation = symptoms.map((e) => e.toString()).join(', ');
+                            situation = symptoms
+                                .map((e) => e.toString())
+                                .join(', ');
                           } else if (symptoms != null) {
                             situation = symptoms.toString();
                           }
@@ -514,10 +515,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
     );
   }
 
-  Future<void> _deletePatient(
-    String patientId,
-    String name,
-  ) async {
+  Future<void> _deletePatient(String patientId, String name) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -551,13 +549,15 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Patient deleted.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Patient deleted.')));
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
     }
   }
 

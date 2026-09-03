@@ -1,25 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:speech_to_text/speech_to_text.dart'
-    as stt;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../services/speech_form_service.dart';
 import '../patient/health_passport_screen.dart';
 
 class SpeechToFormScreen extends StatefulWidget {
-  const SpeechToFormScreen({
-    super.key,
-  });
+  const SpeechToFormScreen({super.key});
 
   @override
-  State<SpeechToFormScreen> createState() =>
-      _SpeechToFormScreenState();
+  State<SpeechToFormScreen> createState() => _SpeechToFormScreenState();
 }
 
-class _SpeechToFormScreenState
-    extends State<SpeechToFormScreen> {
-  final stt.SpeechToText speech =
-      stt.SpeechToText();
+class _SpeechToFormScreenState extends State<SpeechToFormScreen> {
+  final stt.SpeechToText speech = stt.SpeechToText();
 
   bool listening = false;
   bool processing = false;
@@ -29,19 +24,13 @@ class _SpeechToFormScreenState
   Map<String, dynamic>? result;
 
   Future<void> startListening() async {
-    final available =
-        await speech.initialize();
+    final available = await speech.initialize();
 
     if (!available) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Speech recognition is unavailable.',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Speech recognition is unavailable.')),
       );
 
       return;
@@ -56,8 +45,7 @@ class _SpeechToFormScreenState
     await speech.listen(
       onResult: (value) {
         setState(() {
-          transcript =
-              value.recognizedWords;
+          transcript = value.recognizedWords;
         });
       },
     );
@@ -73,12 +61,9 @@ class _SpeechToFormScreenState
 
   Future<void> processWithAI() async {
     if (transcript.trim().isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Please record or enter a patient note first.',
-          ),
+          content: Text('Please record or enter a patient note first.'),
         ),
       );
 
@@ -90,11 +75,7 @@ class _SpeechToFormScreenState
     });
 
     try {
-      final data =
-          await SpeechFormService
-              .extractForm(
-        transcript,
-      );
+      final data = await SpeechFormService.extractForm(transcript);
 
       if (!mounted) return;
 
@@ -109,14 +90,9 @@ class _SpeechToFormScreenState
         processing = false;
       });
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'AI processing failed: $e',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('AI processing failed: $e')));
     }
   }
 
@@ -130,45 +106,46 @@ class _SpeechToFormScreenState
         processing = true;
       });
 
+      final ashaUid = FirebaseAuth.instance.currentUser?.uid;
+      if (ashaUid == null) {
+        throw StateError('An ASHA worker must be signed in.');
+      }
+
       final symptoms = result!['symptoms'];
 
       final redFlags = result!['red_flags'];
 
-      final docRef = await FirebaseFirestore
-          .instance
+      final docRef = await FirebaseFirestore.instance
           .collection('patients')
           .add({
-        'name': result!['patient_name'] ?? '',
+            'name': result!['patient_name'] ?? '',
 
-        'age': result!['age'],
+            'age': result!['age'],
 
-        'gender': result!['gender'] ?? '',
+            'gender': result!['gender'] ?? '',
 
-        'village': result!['village'] ?? '',
+            'village': result!['village'] ?? '',
 
-        'symptoms':
-            symptoms is List ? symptoms : [],
+            'symptoms': symptoms is List ? symptoms : [],
 
-        'duration': result!['duration'] ?? '',
+            'duration': result!['duration'] ?? '',
 
-        'severity': result!['severity'] ?? '',
+            'severity': result!['severity'] ?? '',
 
-        'redFlags':
-            redFlags is List ? redFlags : [],
+            'redFlags': redFlags is List ? redFlags : [],
 
-        'followUpRequired':
-            result!['follow_up_required'] ??
-                false,
+            'followUpRequired': result!['follow_up_required'] ?? false,
 
-        'transcript': transcript,
+            'transcript': transcript,
 
-        'createdAt':
-            FieldValue.serverTimestamp(),
+            'createdAt': FieldValue.serverTimestamp(),
 
-        'source': 'ASHA_AI_SPEECH_FORM',
+            'source': 'ASHA_AI_SPEECH_FORM',
 
-        'status': 'confirmed',
-      });
+            'createdBy': ashaUid,
+
+            'status': 'confirmed',
+          });
 
       final patientId = docRef.id;
 
@@ -178,22 +155,14 @@ class _SpeechToFormScreenState
         processing = false;
       });
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Patient saved successfully.\nID: $patientId',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Patient saved successfully.\nID: $patientId')),
       );
 
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              HealthPassportScreen(
-            patientId: patientId,
-          ),
+          builder: (_) => HealthPassportScreen(patientId: patientId),
         ),
       );
     } catch (e) {
@@ -203,14 +172,9 @@ class _SpeechToFormScreenState
         processing = false;
       });
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Failed to save patient: $e',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to save patient: $e')));
     }
   }
 
@@ -223,18 +187,12 @@ class _SpeechToFormScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'AI Speech-to-Form',
-        ),
-      ),
+      appBar: AppBar(title: const Text('AI Speech-to-Form')),
 
-      backgroundColor:
-          const Color(0xFFF5F9F8),
+      backgroundColor: const Color(0xFFF5F9F8),
 
       body: SingleChildScrollView(
-        padding:
-            const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
 
         child: Column(
           children: [
@@ -244,10 +202,7 @@ class _SpeechToFormScreenState
 
             _transcriptCard(),
 
-            if (result != null) ...[
-              const SizedBox(height: 16),
-              _resultCard(),
-            ],
+            if (result != null) ...[const SizedBox(height: 16), _resultCard()],
           ],
         ),
       ),
@@ -258,14 +213,12 @@ class _SpeechToFormScreenState
     return Container(
       width: double.infinity,
 
-      padding:
-          const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
 
       decoration: BoxDecoration(
         color: Colors.white,
 
-        borderRadius:
-            BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(22),
       ),
 
       child: Column(
@@ -273,51 +226,32 @@ class _SpeechToFormScreenState
           CircleAvatar(
             radius: 38,
 
-            backgroundColor:
-                listening
-                    ? Colors.red.shade50
-                    : const Color(
-                        0xFFE8F6F3,
-                      ),
+            backgroundColor: listening
+                ? Colors.red.shade50
+                : const Color(0xFFE8F6F3),
 
             child: Icon(
-              listening
-                  ? Icons.mic
-                  : Icons.mic_none,
+              listening ? Icons.mic : Icons.mic_none,
 
               size: 40,
 
-              color: listening
-                  ? Colors.red
-                  : const Color(
-                      0xFF087F73,
-                    ),
+              color: listening ? Colors.red : const Color(0xFF087F73),
             ),
           ),
 
           const SizedBox(height: 15),
 
           Text(
-            listening
-                ? 'Listening...'
-                : 'Speak Patient Notes',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight:
-                  FontWeight.bold,
-            ),
+            listening ? 'Listening...' : 'Speak Patient Notes',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 7),
 
           const Text(
             'Speak naturally. Vission Health will convert your notes into a structured form.',
-            textAlign:
-                TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey,
-              height: 1.4,
-            ),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey, height: 1.4),
           ),
 
           const SizedBox(height: 20),
@@ -326,21 +260,11 @@ class _SpeechToFormScreenState
             width: double.infinity,
 
             child: FilledButton.icon(
-              onPressed: listening
-                  ? stopListening
-                  : startListening,
+              onPressed: listening ? stopListening : startListening,
 
-              icon: Icon(
-                listening
-                    ? Icons.stop
-                    : Icons.mic,
-              ),
+              icon: Icon(listening ? Icons.stop : Icons.mic),
 
-              label: Text(
-                listening
-                    ? 'STOP RECORDING'
-                    : 'START SPEAKING',
-              ),
+              label: Text(listening ? 'STOP RECORDING' : 'START SPEAKING'),
             ),
           ),
 
@@ -350,28 +274,18 @@ class _SpeechToFormScreenState
             width: double.infinity,
 
             child: OutlinedButton.icon(
-              onPressed:
-                  processing
-                      ? null
-                      : processWithAI,
+              onPressed: processing ? null : processWithAI,
 
               icon: processing
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child:
-                          CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(
-                      Icons.auto_awesome,
-                    ),
+                  : const Icon(Icons.auto_awesome),
 
               label: Text(
-                processing
-                    ? 'AI PROCESSING...'
-                    : 'EXTRACT FORM WITH AI',
+                processing ? 'AI PROCESSING...' : 'EXTRACT FORM WITH AI',
               ),
             ),
           ),
@@ -384,28 +298,21 @@ class _SpeechToFormScreenState
     return Container(
       width: double.infinity,
 
-      padding:
-          const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(18),
 
       decoration: BoxDecoration(
         color: Colors.white,
 
-        borderRadius:
-            BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(18),
       ),
 
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
           const Text(
             'Transcript',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight:
-                  FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 10),
@@ -416,9 +323,7 @@ class _SpeechToFormScreenState
                 : transcript,
 
             style: TextStyle(
-              color: transcript.isEmpty
-                  ? Colors.grey
-                  : Colors.black87,
+              color: transcript.isEmpty ? Colors.grey : Colors.black87,
 
               height: 1.5,
             ),
@@ -434,106 +339,65 @@ class _SpeechToFormScreenState
     return Container(
       width: double.infinity,
 
-      padding:
-          const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(18),
 
       decoration: BoxDecoration(
         color: Colors.white,
 
-        borderRadius:
-            BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(18),
       ),
 
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
           const Row(
             children: [
-              Icon(
-                Icons.auto_awesome,
-                color:
-                    Color(0xFF087F73),
-              ),
+              Icon(Icons.auto_awesome, color: Color(0xFF087F73)),
 
               SizedBox(width: 8),
 
               Text(
                 'AI Extracted Form',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight:
-                      FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ],
           ),
 
           const SizedBox(height: 18),
 
-          _field(
-            'Patient Name',
-            data['patient_name'],
-          ),
+          _field('Patient Name', data['patient_name']),
 
-          _field(
-            'Age',
-            data['age'],
-          ),
+          _field('Age', data['age']),
 
-          _field(
-            'Gender',
-            data['gender'],
-          ),
+          _field('Gender', data['gender']),
 
-          _field(
-            'Village',
-            data['village'],
-          ),
+          _field('Village', data['village']),
 
-          _field(
-            'Symptoms',
-            data['symptoms'],
-          ),
+          _field('Symptoms', data['symptoms']),
 
-          _field(
-            'Duration',
-            data['duration'],
-          ),
+          _field('Duration', data['duration']),
 
-          _field(
-            'Severity',
-            data['severity'],
-          ),
+          _field('Severity', data['severity']),
 
-          _field(
-            'Red Flags',
-            data['red_flags'],
-          ),
+          _field('Red Flags', data['red_flags']),
 
           const SizedBox(height: 8),
 
           Container(
             width: double.infinity,
 
-            padding:
-                const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
 
             decoration: BoxDecoration(
-              color:
-                  const Color(0xFFFFF8E1),
+              color: const Color(0xFFFFF8E1),
 
-              borderRadius:
-                  BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(12),
             ),
 
             child: const Text(
               'Review the extracted information before saving the patient record.',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.4,
-              ),
+              style: TextStyle(fontSize: 12, height: 1.4),
             ),
           ),
 
@@ -543,16 +407,11 @@ class _SpeechToFormScreenState
             width: double.infinity,
 
             child: FilledButton.icon(
-              onPressed:
-                  processing ? null : savePatient,
+              onPressed: processing ? null : savePatient,
 
-              icon: const Icon(
-                Icons.check,
-              ),
+              icon: const Icon(Icons.check),
 
-              label: const Text(
-                'CONFIRM & SAVE',
-              ),
+              label: const Text('CONFIRM & SAVE'),
             ),
           ),
         ],
@@ -560,17 +419,13 @@ class _SpeechToFormScreenState
     );
   }
 
-  Widget _field(
-    String title,
-    dynamic value,
-  ) {
+  Widget _field(String title, dynamic value) {
     String text;
 
     if (value is List) {
       text = value.join(', ');
     } else {
-      text =
-          value?.toString() ?? '';
+      text = value?.toString() ?? '';
     }
 
     if (text.isEmpty) {
@@ -578,33 +433,19 @@ class _SpeechToFormScreenState
     }
 
     return Padding(
-      padding:
-          const EdgeInsets.only(
-        bottom: 13,
-      ),
+      padding: const EdgeInsets.only(bottom: 13),
 
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Colors.grey,
-            ),
-          ),
+          Text(title, style: const TextStyle(fontSize: 11, color: Colors.grey)),
 
           const SizedBox(height: 3),
 
           Text(
             text,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight:
-                  FontWeight.w500,
-            ),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
           ),
         ],
       ),

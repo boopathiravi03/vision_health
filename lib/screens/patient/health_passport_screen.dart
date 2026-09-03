@@ -10,20 +10,14 @@ import '../schemes/scheme_finder_screen.dart';
 class HealthPassportScreen extends StatefulWidget {
   final String patientId;
 
-  const HealthPassportScreen({
-    super.key,
-    required this.patientId,
-  });
+  const HealthPassportScreen({super.key, required this.patientId});
 
   @override
-  State<HealthPassportScreen> createState() =>
-      _HealthPassportScreenState();
+  State<HealthPassportScreen> createState() => _HealthPassportScreenState();
 }
 
-class _HealthPassportScreenState
-    extends State<HealthPassportScreen> {
-  final PatientService _patientService =
-      PatientService();
+class _HealthPassportScreenState extends State<HealthPassportScreen> {
+  final PatientService _patientService = PatientService();
 
   Map<String, dynamic>? patient;
 
@@ -41,10 +35,7 @@ class _HealthPassportScreenState
 
   Future<void> loadPatient() async {
     try {
-      final data =
-          await _patientService.getPatient(
-        widget.patientId,
-      );
+      final data = await _patientService.getPatient(widget.patientId);
 
       if (!mounted) return;
 
@@ -73,51 +64,35 @@ class _HealthPassportScreenState
     });
 
     try {
-      final age = int.tryParse(
-            patient!['age']?.toString() ?? '',
-          ) ??
-          0;
+      final age = int.tryParse(patient!['age']?.toString() ?? '') ?? 0;
 
-      final rawSymptoms =
-          patient!['symptoms'];
+      final rawSymptoms = patient!['symptoms'];
 
       List<String> symptoms = [];
 
       if (rawSymptoms is List) {
-        symptoms = rawSymptoms
-            .map((e) => e.toString())
-            .toList();
+        symptoms = rawSymptoms.map((e) => e.toString()).toList();
       } else if (rawSymptoms != null) {
         symptoms = [rawSymptoms.toString()];
       }
 
-      final symptomText =
-          symptoms.join(' ').toLowerCase();
+      final symptomText = symptoms.join(' ').toLowerCase();
 
-      final assessment =
-          TriageEngine.assess(
+      final assessment = TriageEngine.assess(
         age: age,
         symptoms: symptoms,
         difficultyBreathing:
             symptomText.contains('difficulty breathing') ||
-                symptomText.contains('breathing difficulty'),
-        unconscious:
-            symptomText.contains('unconscious'),
-        severeBleeding:
-            symptomText.contains('severe bleeding'),
-        chestPain:
-            symptomText.contains('chest pain'),
-        seizure:
-            symptomText.contains('seizure'),
-        severeDehydration:
-            symptomText.contains('severe dehydration'),
+            symptomText.contains('breathing difficulty'),
+        unconscious: symptomText.contains('unconscious'),
+        severeBleeding: symptomText.contains('severe bleeding'),
+        chestPain: symptomText.contains('chest pain'),
+        seizure: symptomText.contains('seizure'),
+        severeDehydration: symptomText.contains('severe dehydration'),
       );
 
-      final explanation =
-          await TriageAiService.getExplanation(
-        patientName:
-            patient!['name']?.toString() ??
-                'Patient',
+      final explanation = await TriageAiService.getExplanation(
+        patientName: patient!['name']?.toString() ?? 'Patient',
         age: age,
         symptoms: symptoms,
         riskLevel: assessment.riskLabel,
@@ -135,16 +110,12 @@ class _HealthPassportScreenState
         context,
         MaterialPageRoute(
           builder: (_) => TriageResultScreen(
-            patientName:
-                patient!['name']?.toString() ??
-                    'Patient',
+            patientName: patient!['name']?.toString() ?? 'Patient',
             age: age,
             symptoms: symptoms,
             riskLevel: assessment.riskLabel,
             action: assessment.action,
-            explanation:
-                explanation['explanation']?.toString() ??
-                    '',
+            explanation: explanation['explanation']?.toString() ?? '',
           ),
         ),
       );
@@ -161,33 +132,19 @@ class _HealthPassportScreenState
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (error != null) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Health Passport'),
-        ),
-        body: const Center(
-          child: Text(
-            'Unable to load patient record.',
-          ),
-        ),
+        appBar: AppBar(title: const Text('Health Passport')),
+        body: const Center(child: Text('Unable to load patient record.')),
       );
     }
 
     if (patient == null) {
       return const Scaffold(
-        body: Center(
-          child: Text(
-            'Patient record not found.',
-          ),
-        ),
+        body: Center(child: Text('Patient record not found.')),
       );
     }
 
@@ -195,63 +152,42 @@ class _HealthPassportScreenState
   }
 
   Widget buildPassport() {
-    final name =
-        patient!['name']?.toString() ?? 'Unknown';
+    final name = patient!['name']?.toString() ?? 'Unknown';
 
-    final age =
-        patient!['age']?.toString() ?? 'N/A';
+    final age = patient!['age']?.toString() ?? 'N/A';
 
-    final gender =
-        patient!['gender']?.toString() ?? 'N/A';
+    final gender = patient!['gender']?.toString() ?? 'N/A';
 
-    final village =
-        patient!['village']?.toString() ?? 'N/A';
+    final village = patient!['village']?.toString() ?? 'N/A';
 
-    final severity =
-        patient!['severity']?.toString() ??
-            'Not assessed';
+    final riskLevel = patient!['riskLevel']?.toString() ?? 'Not assessed';
 
-    final symptoms =
-        patient!['symptoms'] is List
-            ? (patient!['symptoms'] as List)
-                .map((e) => e.toString())
-                .join(', ')
-            : 'None recorded';
+    final symptoms = patient!['symptoms'] is List
+        ? (patient!['symptoms'] as List).map((e) => e.toString()).join(', ')
+        : patient!['symptoms']?.toString().trim().isNotEmpty == true
+        ? patient!['symptoms'].toString()
+        : 'None recorded';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Health Passport',
-        ),
-      ),
+      appBar: AppBar(title: const Text('Health Passport')),
 
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
 
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
 
           children: [
-            const Center(
-              child: Icon(
-                Icons.health_and_safety,
-                size: 80,
-              ),
-            ),
+            const Center(child: Icon(Icons.health_and_safety, size: 80)),
 
             const SizedBox(height: 20),
 
             Center(
               child: Text(
                 'Vission Health',
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(
-                      fontWeight:
-                          FontWeight.bold,
-                    ),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
 
@@ -260,57 +196,32 @@ class _HealthPassportScreenState
             Center(
               child: Text(
                 'Digital Health Passport',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium,
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
 
             const SizedBox(height: 30),
 
-            _infoCard(
-              'Patient ID',
-              widget.patientId,
-            ),
+            _infoCard('Patient ID', widget.patientId),
 
-            _infoCard(
-              'Name',
-              name,
-            ),
+            _infoCard('Name', name),
 
-            _infoCard(
-              'Age',
-              age,
-            ),
+            _infoCard('Age', age),
 
-            _infoCard(
-              'Gender',
-              gender,
-            ),
+            _infoCard('Gender', gender),
 
-            _infoCard(
-              'Village',
-              village,
-            ),
+            _infoCard('Village', village),
 
-            _infoCard(
-              'Symptoms',
-              symptoms,
-            ),
+            _infoCard('Symptoms', symptoms),
 
-            _infoCard(
-              'Risk Level',
-              severity,
-            ),
+            _infoCard('Risk Level', riskLevel),
 
             const SizedBox(height: 25),
 
             const Center(
               child: Text(
                 'Scan this QR at the PHC',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
 
@@ -328,17 +239,14 @@ class _HealthPassportScreenState
                   final patientAge =
                       int.tryParse(patient!['age']?.toString() ?? '') ?? 0;
 
-                  final patientGender =
-                      patient!['gender']?.toString() ?? '';
+                  final patientGender = patient!['gender']?.toString() ?? '';
 
                   final rawSymptoms = patient!['symptoms'];
 
                   String situation = '';
 
                   if (rawSymptoms is List) {
-                    situation = rawSymptoms
-                        .map((e) => e.toString())
-                        .join(', ');
+                    situation = rawSymptoms.map((e) => e.toString()).join(', ');
                   } else if (rawSymptoms != null) {
                     situation = rawSymptoms.toString();
                   }
@@ -366,9 +274,7 @@ class _HealthPassportScreenState
                   ),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(
-                    color: Color(0xFF087F73),
-                  ),
+                  side: const BorderSide(color: Color(0xFF087F73)),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -391,13 +297,9 @@ class _HealthPassportScreenState
                           color: Colors.white,
                         ),
                       )
-                    : const Icon(
-                        Icons.medical_services,
-                      ),
+                    : const Icon(Icons.medical_services),
                 label: Text(
-                  triageLoading
-                      ? 'RUNNING AI TRIAGE...'
-                      : 'RUN AI TRIAGE',
+                  triageLoading ? 'RUNNING AI TRIAGE...' : 'RUN AI TRIAGE',
                 ),
               ),
             ),
@@ -407,9 +309,7 @@ class _HealthPassportScreenState
 
               Text(
                 'Triage failed: $triageError',
-                style: const TextStyle(
-                  color: Colors.red,
-                ),
+                style: const TextStyle(color: Colors.red),
               ),
             ],
 
@@ -422,47 +322,29 @@ class _HealthPassportScreenState
     );
   }
 
-  Widget _infoCard(
-    String title,
-    String value,
-  ) {
+  Widget _infoCard(String title, String value) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(
-        bottom: 12,
-      ),
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
 
       decoration: BoxDecoration(
-        borderRadius:
-            BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(14),
 
-        border: Border.all(
-          color: Colors.grey.shade300,
-        ),
+        border: Border.all(color: Colors.grey.shade300),
       ),
 
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Colors.grey,
-            ),
-          ),
+          Text(title, style: const TextStyle(fontSize: 13, color: Colors.grey)),
 
           const SizedBox(height: 5),
 
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -470,11 +352,6 @@ class _HealthPassportScreenState
   }
 
   Widget buildQr() {
-    return Center(
-      child: QrImageView(
-        data: widget.patientId,
-        size: 220,
-      ),
-    );
+    return Center(child: QrImageView(data: widget.patientId, size: 220));
   }
 }

@@ -4,9 +4,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../services/auth_service.dart';
 import '../../screens/dashboard/asha_dashboard.dart';
+import '../phc/phc_staff_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String role;
+
+  const LoginScreen({super.key, this.role = 'asha'});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -40,17 +43,26 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await _authService.signIn(
+      final credential = await _authService.signIn(
         email: emailController.text,
         password: passwordController.text,
       );
+
+      final user = credential.user;
+      if (user == null || !await _authService.hasRole(user.uid, widget.role)) {
+        await _authService.signOut();
+        _showMessage('This account is not authorised for this role.');
+        return;
+      }
 
       if (!mounted) return;
 
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
-          builder: (_) => const AshaDashboard(),
+          builder: (_) => widget.role == 'phc'
+              ? const PhcStaffScreen()
+              : const AshaDashboard(),
         ),
         (route) => false,
       );
@@ -80,9 +92,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -116,7 +128,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
               Center(
                 child: Text(
-                  'ASHA Worker Login',
+                  widget.role == 'phc'
+                      ? 'PHC Staff Login'
+                      : 'ASHA Worker Login',
                   style: GoogleFonts.inter(
                     fontSize: 25,
                     fontWeight: FontWeight.w800,
@@ -163,15 +177,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(15),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade200,
-                    ),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(15),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade200,
-                    ),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
                   ),
                 ),
               ),
@@ -213,15 +223,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(15),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade200,
-                    ),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(15),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade200,
-                    ),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
                   ),
                 ),
               ),
@@ -250,9 +256,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         )
                       : Text(
                           'LOGIN',
-                          style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w800),
                         ),
                 ),
               ),

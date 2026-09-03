@@ -1,41 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:speech_to_text/speech_to_text.dart'
-    as stt;
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../models/patient.dart';
 import '../../services/alert_service.dart';
-import '../../services/groq_service.dart';
 import '../../services/patient_service.dart';
 import '../../services/risk_service.dart';
+import '../../services/speech_form_service.dart';
 import '../patient/health_passport_screen.dart';
 import '../schemes/scheme_finder_screen.dart';
 
 class VoiceToFormScreen extends StatefulWidget {
-  const VoiceToFormScreen({
-    super.key,
-  });
+  const VoiceToFormScreen({super.key});
 
   @override
-  State<VoiceToFormScreen> createState() =>
-      _VoiceToFormScreenState();
+  State<VoiceToFormScreen> createState() => _VoiceToFormScreenState();
 }
 
-class _VoiceToFormScreenState
-    extends State<VoiceToFormScreen> {
-  final stt.SpeechToText _speech =
-      stt.SpeechToText();
+class _VoiceToFormScreenState extends State<VoiceToFormScreen> {
+  final stt.SpeechToText _speech = stt.SpeechToText();
 
-  final GroqService _groq = GroqService();
+  final PatientService _patientService = PatientService();
 
-  final PatientService _patientService =
-      PatientService();
+  final RiskService _riskService = RiskService();
 
-  final RiskService _riskService =
-      RiskService();
-
-  final AlertService _alertService =
-      AlertService();
+  final AlertService _alertService = AlertService();
 
   bool _isListening = false;
   bool _isProcessing = false;
@@ -43,6 +32,14 @@ class _VoiceToFormScreenState
   String _transcript = '';
 
   Map<String, dynamic>? _patientData;
+
+  final TextEditingController _transcriptController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
+  final TextEditingController _genderController = TextEditingController();
+  final TextEditingController _villageController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _symptomsController = TextEditingController();
 
   String _selectedLanguage = 'en-IN';
 
@@ -53,19 +50,13 @@ class _VoiceToFormScreenState
   };
 
   Future<void> _startListening() async {
-    final available =
-        await _speech.initialize();
+    final available = await _speech.initialize();
 
     if (!available) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Speech recognition is not available',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Speech recognition is not available')),
       );
 
       return;
@@ -74,17 +65,16 @@ class _VoiceToFormScreenState
     setState(() {
       _isListening = true;
       _transcript = '';
+      _transcriptController.clear();
       _patientData = null;
     });
 
     await _speech.listen(
-      listenOptions: stt.SpeechListenOptions(
-        localeId: _selectedLanguage,
-      ),
+      listenOptions: stt.SpeechListenOptions(localeId: _selectedLanguage),
       onResult: (result) {
         setState(() {
-          _transcript =
-              result.recognizedWords;
+          _transcript = result.recognizedWords;
+          _transcriptController.text = _transcript;
         });
       },
     );
@@ -100,13 +90,8 @@ class _VoiceToFormScreenState
 
   Future<void> _processWithAI() async {
     if (_transcript.trim().isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please record a patient note first',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please record a patient note first')),
       );
 
       return;
@@ -117,10 +102,19 @@ class _VoiceToFormScreenState
     });
 
     try {
-      final result =
-          await _groq.extractPatientData(
-        _transcript,
-      );
+      final result = await SpeechFormService.extractForm(_transcript);
+
+      if (!mounted) return;
+
+      _nameController.text = result['patient_name']?.toString() ?? '';
+      _ageController.text = result['age']?.toString() ?? '';
+      _genderController.text = result['gender']?.toString() ?? '';
+      _villageController.text = result['village']?.toString() ?? '';
+      _phoneController.clear();
+      final symptoms = result['symptoms'];
+      _symptomsController.text = symptoms is List
+          ? symptoms.map((item) => item.toString()).join(', ')
+          : symptoms?.toString() ?? '';
 
       setState(() {
         _patientData = result;
@@ -128,14 +122,9 @@ class _VoiceToFormScreenState
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'AI processing failed: $e',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('AI processing failed: $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -148,35 +137,18 @@ class _VoiceToFormScreenState
   Future<void> _savePatient() async {
     if (_patientData == null) return;
 
-    final data = _patientData!;
-
-    final name =
-        data['name']?.toString().trim() ?? '';
-
-    final ageText =
-        data['age']?.toString().trim() ?? '';
-
-    final gender =
-        data['gender']?.toString().trim() ?? '';
-
-    final village =
-        data['village']?.toString().trim() ?? '';
-
-    final phone =
-        data['phone']?.toString().trim() ?? '';
-
-    final symptoms =
-        data['symptoms']?.toString().trim() ?? '';
+    final name = _nameController.text.trim();
+    final ageText = _ageController.text.trim();
+    final gender = _genderController.text.trim();
+    final village = _villageController.text.trim();
+    final phone = _phoneController.text.trim();
+    final symptoms = _symptomsController.text.trim();
 
     final age = int.tryParse(ageText) ?? 0;
 
     if (name.isEmpty || age <= 0 || symptoms.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Name, age and symptoms are required.',
-          ),
-        ),
+        const SnackBar(content: Text('Name, age and symptoms are required.')),
       );
 
       return;
@@ -195,19 +167,12 @@ class _VoiceToFormScreenState
     if (risk.level == 'Urgent') {
       followUp = now;
     } else if (risk.level == 'Follow-up') {
-      followUp = now.add(
-        const Duration(days: 1),
-      );
+      followUp = now.add(const Duration(days: 1));
     } else {
-      followUp = now.add(
-        const Duration(days: 7),
-      );
+      followUp = now.add(const Duration(days: 7));
     }
 
-    final followUpDate =
-        DateFormat('yyyy-MM-dd').format(
-      followUp,
-    );
+    final followUpDate = DateFormat('yyyy-MM-dd').format(followUp);
 
     final patient = Patient(
       id: '',
@@ -220,15 +185,11 @@ class _VoiceToFormScreenState
       status: 'Pending',
       followUpDate: followUpDate,
       riskLevel: risk.level,
-      aiRecommendation:
-          risk.recommendation,
+      aiRecommendation: risk.recommendation,
     );
 
     try {
-      final patientId =
-          await _patientService.addPatient(
-        patient,
-      );
+      final patientId = await _patientService.addPatient(patient);
 
       if (risk.level == 'Urgent') {
         await _alertService.createAlert(
@@ -236,8 +197,7 @@ class _VoiceToFormScreenState
           patientName: name,
           riskLevel: risk.level,
           symptoms: symptoms,
-          recommendation:
-              risk.recommendation,
+          recommendation: risk.recommendation,
           village: village,
         );
       }
@@ -250,10 +210,7 @@ class _VoiceToFormScreenState
           return AlertDialog(
             title: const Row(
               children: [
-                Icon(
-                  Icons.check_circle,
-                  color: Color(0xFF087F73),
-                ),
+                Icon(Icons.check_circle, color: Color(0xFF087F73)),
                 SizedBox(width: 8),
                 Text('Patient Saved'),
               ],
@@ -284,12 +241,8 @@ class _VoiceToFormScreenState
                     ),
                   );
                 },
-                icon: const Icon(
-                  Icons.account_balance,
-                ),
-                label: const Text(
-                  'VIEW BENEFITS',
-                ),
+                icon: const Icon(Icons.account_balance),
+                label: const Text('VIEW BENEFITS'),
               ),
               FilledButton.icon(
                 onPressed: () {
@@ -298,18 +251,12 @@ class _VoiceToFormScreenState
                     context,
                     MaterialPageRoute(
                       builder: (_) =>
-                          HealthPassportScreen(
-                        patientId: patientId,
-                      ),
+                          HealthPassportScreen(patientId: patientId),
                     ),
                   );
                 },
-                icon: const Icon(
-                  Icons.qr_code_2,
-                ),
-                label: const Text(
-                  'HEALTH PASSPORT',
-                ),
+                icon: const Icon(Icons.qr_code_2),
+                label: const Text('HEALTH PASSPORT'),
               ),
             ],
           );
@@ -318,41 +265,37 @@ class _VoiceToFormScreenState
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Failed to save patient: $e',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to save patient: $e')));
     }
   }
 
   @override
   void dispose() {
     _speech.stop();
+    _transcriptController.dispose();
+    _nameController.dispose();
+    _ageController.dispose();
+    _genderController.dispose();
+    _villageController.dispose();
+    _phoneController.dispose();
+    _symptomsController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          const Color(0xFFF7FAF9),
+      backgroundColor: const Color(0xFFF7FAF9),
 
-      appBar: AppBar(
-        title: const Text(
-          'Speech-to-Form',
-        ),
-      ),
+      appBar: AppBar(title: const Text('Speech-to-Form')),
 
       body: SingleChildScrollView(
-        padding:
-            const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
 
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
 
           children: [
             _introCard(),
@@ -361,51 +304,37 @@ class _VoiceToFormScreenState
 
             const Text(
               'Patient Voice Note',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
 
-             const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-             _languageSelector(),
+            _languageSelector(),
 
-             const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-             _recordButton(),
+            _recordButton(),
 
             const SizedBox(height: 20),
 
             _transcriptCard(),
 
-            if (_transcript.isNotEmpty)
-              const SizedBox(height: 16),
+            if (_transcript.isNotEmpty) const SizedBox(height: 16),
 
             if (_transcript.isNotEmpty)
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed:
-                      _isProcessing
-                          ? null
-                          : _processWithAI,
+                  onPressed: _isProcessing ? null : _processWithAI,
                   icon: _isProcessing
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child:
-                              CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(
-                          Icons.auto_awesome,
-                        ),
+                      : const Icon(Icons.auto_awesome),
                   label: Text(
-                    _isProcessing
-                        ? 'AI PROCESSING...'
-                        : 'EXTRACT PATIENT DATA',
+                    _isProcessing ? 'AI PROCESSING...' : 'EXTRACT PATIENT DATA',
                   ),
                 ),
               ),
@@ -422,40 +351,27 @@ class _VoiceToFormScreenState
 
   Widget _introCard() {
     return Container(
-      padding:
-          const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(18),
 
       decoration: BoxDecoration(
-        color:
-            const Color(0xFFE8F6F3),
-        borderRadius:
-            BorderRadius.circular(18),
+        color: const Color(0xFFE8F6F3),
+        borderRadius: BorderRadius.circular(18),
       ),
 
       child: const Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.mic,
-            color: Color(0xFF087F73),
-            size: 32,
-          ),
+          Icon(Icons.mic, color: Color(0xFF087F73), size: 32),
 
           SizedBox(width: 12),
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Speak naturally',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight:
-                        FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: 5),
                 Text(
@@ -472,13 +388,10 @@ class _VoiceToFormScreenState
   Widget _recordButton() {
     return Center(
       child: GestureDetector(
-        onTap: _isListening
-            ? _stopListening
-            : _startListening,
+        onTap: _isListening ? _stopListening : _startListening,
 
         child: AnimatedContainer(
-          duration:
-              const Duration(milliseconds: 250),
+          duration: const Duration(milliseconds: 250),
 
           width: 110,
           height: 110,
@@ -486,30 +399,20 @@ class _VoiceToFormScreenState
           decoration: BoxDecoration(
             shape: BoxShape.circle,
 
-            color: _isListening
-                ? Colors.red
-                : const Color(0xFF087F73),
+            color: _isListening ? Colors.red : const Color(0xFF087F73),
 
             boxShadow: [
               BoxShadow(
-                blurRadius:
-                    _isListening ? 25 : 12,
-                spreadRadius:
-                    _isListening ? 6 : 2,
-                color: (_isListening
-                        ? Colors.red
-                        : const Color(
-                            0xFF087F73,
-                          ))
+                blurRadius: _isListening ? 25 : 12,
+                spreadRadius: _isListening ? 6 : 2,
+                color: (_isListening ? Colors.red : const Color(0xFF087F73))
                     .withValues(alpha: 0.20),
               ),
             ],
           ),
 
           child: Icon(
-            _isListening
-                ? Icons.stop
-                : Icons.mic,
+            _isListening ? Icons.stop : Icons.mic,
             color: Colors.white,
             size: 46,
           ),
@@ -521,41 +424,29 @@ class _VoiceToFormScreenState
   Widget _languageSelector() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFE0E9E6),
-        ),
+        border: Border.all(color: const Color(0xFFE0E9E6)),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _selectedLanguage,
           isExpanded: true,
-          icon: const Icon(
-            Icons.keyboard_arrow_down,
-          ),
-          items: _languages.entries.map(
-            (entry) {
-              return DropdownMenuItem<String>(
-                value: entry.key,
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.language,
-                      color: Color(0xFF087F73),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(entry.value),
-                  ],
-                ),
-              );
-            },
-          ).toList(),
+          icon: const Icon(Icons.keyboard_arrow_down),
+          items: _languages.entries.map((entry) {
+            return DropdownMenuItem<String>(
+              value: entry.key,
+              child: Row(
+                children: [
+                  const Icon(Icons.language, color: Color(0xFF087F73)),
+                  const SizedBox(width: 10),
+                  Text(entry.value),
+                ],
+              ),
+            );
+          }).toList(),
           onChanged: (value) {
             if (value == null) return;
 
@@ -571,43 +462,38 @@ class _VoiceToFormScreenState
   Widget _transcriptCard() {
     return Container(
       width: double.infinity,
-      padding:
-          const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
 
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(16),
-        border: Border.all(
-          color:
-              const Color(0xFFE0E9E6),
-        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE0E9E6)),
       ),
 
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
           const Text(
             'Transcript',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 10),
 
-          Text(
-            _transcript.isEmpty
-                ? 'Your spoken note will appear here...'
-                : _transcript,
-            style: TextStyle(
-              color: _transcript.isEmpty
-                  ? Colors.grey
-                  : Colors.black87,
-              height: 1.5,
+          TextField(
+            controller: _transcriptController,
+            minLines: 3,
+            maxLines: 6,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              hintText:
+                  'Your spoken note will appear here. You can correct it before AI extraction.',
+              border: InputBorder.none,
             ),
+            onChanged: (value) {
+              _transcript = value;
+            },
           ),
         ],
       ),
@@ -615,78 +501,57 @@ class _VoiceToFormScreenState
   }
 
   Widget _patientPreview() {
-    final data = _patientData!;
-
     return Container(
       width: double.infinity,
-      padding:
-          const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(18),
 
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(18),
-        border: Border.all(
-          color:
-              const Color(0xFF087F73),
-          width: 1.5,
-        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF087F73), width: 1.5),
       ),
 
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
           const Row(
             children: [
-              Icon(
-                Icons.auto_awesome,
-                color:
-                    Color(0xFF087F73),
-              ),
+              Icon(Icons.auto_awesome, color: Color(0xFF087F73)),
               SizedBox(width: 8),
               Text(
                 'AI Extracted Record',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight:
-                      FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ],
           ),
 
           const SizedBox(height: 18),
 
-          _field(
-            'Name',
-            data['name'],
+          const Text(
+            'Check and correct the AI-extracted details before saving. Nothing is saved automatically.',
+            style: TextStyle(color: Colors.black54, height: 1.4),
           ),
 
-          _field(
+          const SizedBox(height: 16),
+
+          _editableField('Name', _nameController),
+          _editableField(
             'Age',
-            data['age'],
+            _ageController,
+            keyboardType: TextInputType.number,
           ),
-
-          _field(
-            'Gender',
-            data['gender'],
+          _editableField('Gender', _genderController),
+          _editableField('Village', _villageController),
+          _editableField(
+            'Phone (optional)',
+            _phoneController,
+            keyboardType: TextInputType.phone,
           ),
-
-          _field(
-            'Village',
-            data['village'],
-          ),
-
-          _field(
-            'Phone',
-            data['phone'],
-          ),
-
-          _field(
-            'Symptoms',
-            data['symptoms'],
+          _editableField(
+            'Symptoms (separate with commas)',
+            _symptomsController,
+            maxLines: 3,
           ),
 
           const SizedBox(height: 16),
@@ -695,12 +560,8 @@ class _VoiceToFormScreenState
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: _savePatient,
-              icon: const Icon(
-                Icons.save,
-              ),
-              label: const Text(
-                'SAVE PATIENT RECORD',
-              ),
+              icon: const Icon(Icons.save),
+              label: const Text('SAVE PATIENT RECORD'),
             ),
           ),
         ],
@@ -708,17 +569,17 @@ class _VoiceToFormScreenState
     );
   }
 
-  Widget _field(
+  Widget _editableField(
     String label,
-    dynamic value,
-  ) {
+    TextEditingController controller, {
+    TextInputType? keyboardType,
+    int maxLines = 1,
+  }) {
     return Padding(
-      padding:
-          const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 12),
 
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
           Text(
@@ -726,22 +587,21 @@ class _VoiceToFormScreenState
             style: const TextStyle(
               fontSize: 11,
               color: Colors.grey,
-              fontWeight:
-                  FontWeight.bold,
+              fontWeight: FontWeight.bold,
             ),
           ),
 
-          const SizedBox(height: 3),
+          const SizedBox(height: 5),
 
-          Text(
-            value?.toString().isNotEmpty ==
-                    true
-                ? value.toString()
-                : 'Not provided',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight:
-                  FontWeight.w600,
+          TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            maxLines: maxLines,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              isDense: true,
+              hintText: 'Not provided',
+              border: OutlineInputBorder(),
             ),
           ),
         ],

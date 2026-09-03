@@ -2,8 +2,60 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    function signedIn() { return request.auth != null; }
+    function role() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function isAsha() { return signedIn() && role() == 'asha'; }
+    function isPhc() { return signedIn() && role() == 'phc'; }
+    function isPatient() { return signedIn() && role() == 'patient'; }
+
+    match /users/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    match /patients/{patientId} {
+      allow create: if isAsha()
+          && request.resource.data.createdBy == request.auth.uid;
+      allow read: if isAsha() && resource.data.createdBy == request.auth.uid
+          || isPatient() && resource.data.patientAuthUid == request.auth.uid;
+      allow update, delete: if isAsha()
+          && resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdBy == resource.data.createdBy;
+    }
+
+    match /visits/{visitId} {
+      allow create: if isAsha()
+          && request.resource.data.createdBy == request.auth.uid;
+      allow read: if isAsha() && resource.data.createdBy == request.auth.uid
+          || isPatient() && resource.data.patientAuthUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /referrals/{referralId} {
+      allow create: if isAsha()
+          && request.resource.data.createdBy == request.auth.uid;
+      allow read: if isAsha() && resource.data.createdBy == request.auth.uid
+          || isPatient() && resource.data.patientAuthUid == request.auth.uid
+          || isPhc() && resource.data.assignedPhcUid == request.auth.uid;
+      allow update: if isAsha() && resource.data.createdBy == request.auth.uid
+          || isPhc() && resource.data.assignedPhcUid == request.auth.uid;
+      allow delete: if isAsha() && resource.data.createdBy == request.auth.uid;
+    }
+
+    match /alerts/{alertId} {
+      allow create: if isAsha()
+          && request.resource.data.createdBy == request.auth.uid;
+      allow read: if isAsha() && resource.data.createdBy == request.auth.uid
+          || isPhc() && resource.data.assignedPhcUid == request.auth.uid;
+      allow update: if isPhc() && resource.data.assignedPhcUid == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /schemes/{schemeId} {
+      allow read: if signedIn();
+      allow write: if false;
     }
   }
 }

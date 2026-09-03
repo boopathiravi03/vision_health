@@ -7,6 +7,8 @@ import '../auth/login_screen.dart';
 import '../dashboard/asha_dashboard.dart';
 import '../patient_portal/patient_portal_screen.dart';
 import '../phc/phc_staff_screen.dart';
+import '../../services/patient_service.dart';
+import '../../services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -20,21 +22,34 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
 
-    Timer(const Duration(seconds: 2), () {
+    Timer(const Duration(seconds: 2), () async {
       if (!mounted) return;
 
-      final user =
-          FirebaseAuth.instance.currentUser;
+      final user = FirebaseAuth.instance.currentUser;
 
-      final destination = user != null
-          ? const AshaDashboard()
-          : const WelcomeScreen();
+      Widget destination = const WelcomeScreen();
+      if (user != null) {
+        final role = await AuthService().getRole(user.uid);
+        final patient = role == 'patient'
+            ? await PatientService().getPatientForAuthUid(user.uid)
+            : null;
+        if (!mounted) return;
+        if (patient != null) {
+          final name = patient['name']?.toString().trim();
+          destination = PatientPortalScreen(
+            patientId: patient['id'].toString(),
+            patientName: name?.isNotEmpty == true ? name! : 'Patient',
+          );
+        } else if (role == 'asha') {
+          destination = const AshaDashboard();
+        } else if (role == 'phc') {
+          destination = const PhcStaffScreen();
+        }
+      }
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (_) => destination,
-        ),
+        MaterialPageRoute(builder: (_) => destination),
       );
     });
   }
@@ -77,10 +92,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const Text(
               'AI-powered rural healthcare assistant',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 15, color: Colors.grey),
             ),
 
             const SizedBox(height: 35),
@@ -145,11 +157,7 @@ class WelcomeScreen extends StatelessWidget {
                 'A simple AI-assisted healthcare platform '
                 'for rural health workers and PHC staff.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  height: 1.5,
-                  color: Colors.grey,
-                ),
+                style: TextStyle(fontSize: 16, height: 1.5, color: Colors.grey),
               ),
 
               const SizedBox(height: 40),
@@ -169,9 +177,7 @@ class WelcomeScreen extends StatelessWidget {
                   icon: const Icon(Icons.arrow_forward),
                   label: const Text(
                     'GET STARTED',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -190,9 +196,7 @@ class RoleSelectionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F9F8),
-      appBar: AppBar(
-        title: const Text('Select Your Role'),
-      ),
+      appBar: AppBar(title: const Text('Select Your Role')),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -202,20 +206,14 @@ class RoleSelectionScreen extends StatelessWidget {
 
             const Text(
               'Who are you?',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 8),
 
             const Text(
               'Select your role to continue.',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: Colors.grey, fontSize: 16),
             ),
 
             const SizedBox(height: 30),
@@ -229,10 +227,7 @@ class RoleSelectionScreen extends StatelessWidget {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        const LoginScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
                 );
               },
             ),
@@ -249,8 +244,7 @@ class RoleSelectionScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) =>
-                        const PatientPortalScreen(),
+                    builder: (_) => const PatientPortalAccessScreen(),
                   ),
                 );
               },
@@ -262,14 +256,12 @@ class RoleSelectionScreen extends StatelessWidget {
               context,
               icon: Icons.local_hospital,
               title: 'PHC Staff',
-              subtitle:
-                  'View patient records and manage healthcare referrals.',
+              subtitle: 'View patient records and manage healthcare referrals.',
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) =>
-                        const PhcStaffScreen(),
+                    builder: (_) => const LoginScreen(role: 'phc'),
                   ),
                 );
               },
@@ -296,9 +288,7 @@ class RoleSelectionScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: const Color(0xFFE2EAE8),
-          ),
+          border: Border.all(color: const Color(0xFFE2EAE8)),
         ),
         child: Row(
           children: [
@@ -309,19 +299,14 @@ class RoleSelectionScreen extends StatelessWidget {
                 color: const Color(0xFFE8F6F3),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: Icon(
-                icon,
-                size: 34,
-                color: const Color(0xFF087F73),
-              ),
+              child: Icon(icon, size: 34, color: const Color(0xFF087F73)),
             ),
 
             const SizedBox(width: 18),
 
             Expanded(
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
@@ -335,20 +320,13 @@ class RoleSelectionScreen extends StatelessWidget {
 
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      height: 1.35,
-                    ),
+                    style: const TextStyle(color: Colors.grey, height: 1.35),
                   ),
                 ],
               ),
             ),
 
-            const Icon(
-              Icons.arrow_forward_ios,
-              size: 18,
-              color: Colors.grey,
-            ),
+            const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.grey),
           ],
         ),
       ),

@@ -1,10 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/referral.dart';
 
 class ReferralService {
-  final FirebaseFirestore _firestore =
-      FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<String> createReferral({
     required String patientName,
@@ -15,8 +16,11 @@ class ReferralService {
     required String reason,
     required String recommendedAction,
   }) async {
-    final doc =
-        _firestore.collection('referrals').doc();
+    final doc = _firestore.collection('referrals').doc();
+    final ashaUid = _auth.currentUser?.uid;
+    if (ashaUid == null) {
+      throw StateError('An ASHA worker must be signed in.');
+    }
 
     final referral = Referral(
       id: doc.id,
@@ -31,14 +35,12 @@ class ReferralService {
       status: 'Pending',
     );
 
-    await doc.set(referral.toMap());
+    await doc.set({...referral.toMap(), 'createdBy': ashaUid});
 
     return doc.id;
   }
 
-  Future<Map<String, dynamic>?> getReferral(
-    String referralId,
-  ) async {
+  Future<Map<String, dynamic>?> getReferral(String referralId) async {
     final document = await _firestore
         .collection('referrals')
         .doc(referralId)
