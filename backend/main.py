@@ -473,107 +473,175 @@ async def medicine_analyze(
                 detail="Image is empty."
             )
 
+        if len(image_bytes) > 8 * 1024 * 1024:
+            raise HTTPException(
+                status_code=413,
+                detail="Image is too large. Please select a smaller image."
+            )
+
         encoded_image = base64.b64encode(
             image_bytes
         ).decode("utf-8")
 
-        response = client.chat.completions.create(
-            model="qwen/qwen3.6-27b",
-            messages=[
-                {
-                    "role": "system",
-                    "content": """
-You are a cautious medicine-package information
-assistant for Vission Health.
+        mime_type = file.content_type or "image/jpeg"
 
-Analyze ONLY information visibly present on the
-medicine strip, box or package.
+        prompt = """
+You are Vission Health's cautious medicine-package
+information assistant.
 
-Do NOT diagnose.
-Do NOT prescribe.
-Do NOT tell the patient to start, stop or change
-a medicine.
+Analyze ONLY what is visibly present on the medicine
+strip, box or package.
+
+You must NOT:
+- diagnose a disease
+- prescribe medicine
+- tell the patient to start, stop or change a medicine
+- invent a medicine name
+- guess the strength
+- invent dosage or timing that is not explicitly visible
+- give dosage instructions that are not printed on the package
 
 Return ONLY valid JSON.
 
 Required format:
 
 {
-  "image_quality_good": true,
   "medicine_name": "",
   "strength": "",
-  "visible_text": "",
-  "medicine_type": "",
-  "what_it_appears_to_be_for": "",
-  "instructions_visible": "",
+  "composition": "",
+  "general_use": "",
+  "dosage": null,
+  "timing": null,
+  "duration": null,
+  "expiry": "",
+  "batch_number": "",
+  "manufacturer": "",
   "confidence": "LOW",
-  "needs_verification": true,
-  "simple_explanation": "",
-  "warning": "Confirm the medicine with an ASHA worker, doctor or pharmacist."
+  "visible_instructions": [],
+  "warnings": [],
+  "needs_verification": true
 }
 
 Rules:
 
-1. Never invent a medicine name.
-2. Never guess the strength.
-3. If the medicine name cannot be read,
-   return an empty string.
-4. If the image is blurry or unclear,
-   image_quality_good must be false.
-5. confidence must be LOW, MEDIUM or HIGH.
-6. needs_verification must normally be true.
-7. Only describe information that can reasonably
-   be determined from the visible package.
-8. Do not provide dosage recommendations.
-9. Do not recommend starting or stopping medication.
-10. Keep simple_explanation short and patient-friendly.
+1. medicine_name must be the exact name as printed.
+2. strength must be exactly as printed, e.g. "500 mg".
+3. composition should reflect printed active ingredients.
+4. general_use should state what the medicine is generally
+   used for, ONLY if the medicine name is confidently identified.
+   If the medicine cannot be identified, set it to "".
+5. dosage, timing and duration must be null unless they are
+   explicitly printed on the package or prescription.
+   Do not infer them from general knowledge.
+6. visible_instructions must contain only text that is
+   literally printed on the packaging.
+7. warnings must contain only printed warnings.
+8. confidence must be exactly one of:
+   LOW, MEDIUM, HIGH
+9. needs_verification should normally be true.
+10. If the medicine cannot be identified from the image,
+    set medicine_name to "" and confidence to "LOW".
+11. If the image is blurry, dark, cropped or unclear,
+    still return the JSON, but set confidence to "LOW"
+    and explain in visible_instructions that the image is unclear.
+12. Never invent information.
 """
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": """
-Read the medicine package carefully.
 
-Identify only visible medicine information.
-If the medicine cannot be reliably identified,
-say so instead of guessing.
+        def call_groq():
+            return client.chat.completions.create(
+                model="meta-llama/llama-4-scout-17b-16e-instruct",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": prompt,
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    "Read this medicine package carefully. "
+                                    "Extract only visible printed information. "
+                                    "Return JSON only."
+                                ),
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": (
+                                        f"data:{mime_type};base64,"
+                                        f"{encoded_image}"
+                                    )
+                                },
+                            },
+                        ],
+                    },
+                ],
+                temperature=0,
+                max_tokens=500,
+            )
 
-Return JSON only.
-"""
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url":
-                                f"data:{file.content_type};base64,{encoded_image}"
-                            }
-                        }
-                    ]
-                }
-            ],
-            temperature=0.1,
-            max_tokens=600,
+        response = await asyncio.wait_for(
+            asyncio.to_thread(call_groq),
+            timeout=70,
         )
 
         content = response.choices[0].message.content
 
-        result = json.loads(
-            content.replace("```json", "")
-                   .replace("```", "")
-                   .strip()
+        if not content:
+            raise HTTPException(
+                status_code=502,
+                detail="Vision AI returned an empty response."
+            )
+
+        cleaned = (
+            content
+            .replace("```json", "")
+            .replace("```", "")
+            .strip()
         )
+
+        data = json.loads(cleaned)
+
+        if not isinstance(data, dict):
+            raise HTTPException(
+                status_code=502,
+                detail="Vision AI returned an invalid result."
+            )
+
+        data.setdefault("medicine_name", "")
+        data.setdefault("strength", "")
+        data.setdefault("composition", "")
+        data.setdefault("general_use", "")
+        data.setdefault("dosage", None)
+        data.setdefault("timing", None)
+        data.setdefault("duration", None)
+        data.setdefault("expiry", "")
+        data.setdefault("batch_number", "")
+        data.setdefault("manufacturer", "")
+        data.setdefault("confidence", "LOW")
+        data.setdefault("visible_instructions", [])
+        data.setdefault("warnings", [])
+        data.setdefault("needs_verification", True)
 
         return {
             "success": True,
-            "data": result,
+            "data": data,
         }
+
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "Vision AI took too long to respond. "
+                "Please try a clearer or smaller image."
+            )
+        )
 
     except json.JSONDecodeError:
         raise HTTPException(
-            status_code=500,
+            status_code=502,
             detail="Vision AI returned invalid JSON."
         )
 
@@ -583,7 +651,7 @@ Return JSON only.
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=f"Medicine analysis failed: {str(e)}"
         )
 
 

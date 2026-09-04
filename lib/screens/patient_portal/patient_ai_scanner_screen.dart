@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -86,7 +87,7 @@ class _PatientAiScannerScreenState
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('$_baseUrl/vision-analyze'),
+        Uri.parse('$_baseUrl/medicine-analyze'),
       );
 
       request.files.add(
@@ -475,29 +476,59 @@ class _PatientAiScannerScreenState
   Widget _resultCard() {
     final result = _result!;
 
-    final quality =
-        result['image_quality_good'] == true;
+    final quality = result['image_quality_good'] == true;
 
-    final observation =
-        result['observation']?.toString() ?? '';
+    final medicineName =
+        _value(result['medicine_name'], 'Not clearly identified');
 
-    final indicators =
-        result['visible_indicators'];
+    final strength =
+        _value(result['strength'], 'Not visible');
 
-    final urgency =
-        result['urgency']?.toString() ?? 'UNKNOWN';
+    final medicineType =
+        _value(result['medicine_type'], 'Medicine');
 
-    final recommendation =
-        result['recommendation']?.toString() ?? '';
+    final whatItIs =
+        _value(result['what_it_is'], 'Not available');
 
-    final disclaimer =
-        result['disclaimer']?.toString() ??
-            'This is a screening aid and not a diagnosis.';
+    final usedFor =
+        _value(result['what_it_is_used_for'], 'Not available');
+
+    final whenToTake = _value(
+      result['when_to_take'],
+      'Not shown on the image; follow the prescription or package label.',
+    );
+
+    final howToTake = _value(
+      result['how_to_take'],
+      'Not shown on the image; follow the prescription or package label.',
+    );
+
+    final explanation =
+        _value(result['simple_explanation'], '');
+
+    final confidence =
+        _value(result['confidence'], 'LOW');
+
+    final visibleText =
+        _value(result['visible_text'], '');
+
+    final sideEffects =
+        _stringList(result['common_side_effects']);
+
+    final warnings =
+        _stringList(result['warnings']);
+
+    final aiWarning = _value(
+      result['warning'],
+      'Verify the medicine with a doctor, pharmacist or ASHA worker.',
+    );
+
+    final needsVerification =
+        result['needs_verification'] != false;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -505,23 +536,18 @@ class _PatientAiScannerScreenState
           color: const Color(0xFFE0E9E6),
         ),
       ),
-
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
               Icon(
-                Icons.auto_awesome,
+                Icons.medication_rounded,
                 color: Color(0xFF087F73),
               ),
-
               SizedBox(width: 8),
-
               Text(
-                'AI Analysis',
+                'Medicine Information',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -532,57 +558,240 @@ class _PatientAiScannerScreenState
 
           const SizedBox(height: 18),
 
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F6F3),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  medicineName,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF073B36),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$strength • $medicineType',
+                  style: const TextStyle(
+                    color: Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          if (explanation.isNotEmpty)
+            _infoSection(
+              icon: Icons.lightbulb_outline_rounded,
+              title: 'Simple explanation',
+              text: explanation,
+            ),
+
+          _infoSection(
+            icon: Icons.info_outline_rounded,
+            title: 'What is this medicine?',
+            text: whatItIs,
+          ),
+
+          _infoSection(
+            icon: Icons.medical_services_outlined,
+            title: 'What is it used for?',
+            text: usedFor,
+          ),
+
+          _infoSection(
+            icon: Icons.schedule_rounded,
+            title: 'When to take',
+            text: whenToTake,
+          ),
+
+          _infoSection(
+            icon: Icons.restaurant_outlined,
+            title: 'How to take',
+            text: howToTake,
+          ),
+
+          if (visibleText.isNotEmpty)
+            _infoSection(
+              icon: Icons.visibility_outlined,
+              title: 'Text visible on package',
+              text: visibleText,
+            ),
+
+          if (sideEffects.isNotEmpty)
+            _bulletSection(
+              icon: Icons.warning_amber_rounded,
+              title: 'Common side effects',
+              items: sideEffects,
+            ),
+
+          if (warnings.isNotEmpty)
+            _bulletSection(
+              icon: Icons.health_and_safety_outlined,
+              title: 'Important warnings',
+              items: warnings,
+            ),
+
+          const SizedBox(height: 12),
+
+          _resultRow(
+            'AI confidence',
+            confidence,
+          ),
+
           _resultRow(
             'Image quality',
-            quality
-                ? 'Good'
-                : 'Not suitable for analysis',
+            quality ? 'Good' : 'Needs a clearer image',
           ),
 
-          _resultRow(
-            'Urgency',
-            urgency,
-          ),
-
-          if (observation.isNotEmpty)
-            _resultSection(
-              'What AI can see',
-              observation,
-            ),
-
-          if (indicators is List &&
-              indicators.isNotEmpty)
-            _indicatorList(indicators),
-
-          if (recommendation.isNotEmpty)
-            _resultSection(
-              'What you should do',
-              recommendation,
-            ),
-
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
 
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(12),
-
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: Colors.amber.shade50,
-              borderRadius:
-                  BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
             ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.verified_user_outlined,
+                  color: Colors.orange,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    needsVerification
+                        ? aiWarning
+                        : 'Always follow the prescription or package label.',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            child: Text(
-              disclaimer,
-              style: const TextStyle(
-                fontSize: 12,
-                height: 1.45,
+  Widget _infoSection({
+    required IconData icon,
+    required String title,
+    required String text,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 23,
+            color: const Color(0xFF087F73),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bulletSection({
+    required IconData icon,
+    required String title,
+    required List<String> items,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icon,
+                color: const Color(0xFF087F73),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ...items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('• '),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: const TextStyle(height: 1.4),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _value(dynamic value, String fallback) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? fallback : text;
+  }
+
+  List<String> _stringList(dynamic value) {
+    if (value is! List) return [];
+
+    return value
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
   }
 
   Widget _resultRow(
@@ -607,88 +816,6 @@ class _PatientAiScannerScreenState
 
           Expanded(
             child: Text(value),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _resultSection(
-    String title,
-    String text,
-  ) {
-    return Padding(
-      padding:
-          const EdgeInsets.only(top: 8),
-
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-
-          const SizedBox(height: 7),
-
-          Text(
-            text,
-            style: const TextStyle(
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _indicatorList(List indicators) {
-    return Padding(
-      padding:
-          const EdgeInsets.only(top: 10),
-
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-
-        children: [
-          const Text(
-            'Visible indicators',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-
-          const SizedBox(height: 6),
-
-          ...indicators.map(
-            (item) => Padding(
-              padding:
-                  const EdgeInsets.symmetric(
-                vertical: 3,
-              ),
-
-              child: Row(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-
-                children: [
-                  const Text('• '),
-
-                  Expanded(
-                    child: Text(
-                      item.toString(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
         ],
       ),
@@ -737,13 +864,4 @@ class _PatientAiScannerScreenState
       ),
     );
   }
-}
-
-class TimeoutException implements Exception {
-  final String message;
-
-  TimeoutException(this.message);
-
-  @override
-  String toString() => message;
 }
