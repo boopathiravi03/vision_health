@@ -1,4 +1,5 @@
 import os
+import asyncio
 import json
 import base64
 
@@ -593,22 +594,37 @@ async def vision_analyze(
     try:
         image_bytes = await file.read()
 
+        if not image_bytes:
+            raise HTTPException(
+                status_code=400,
+                detail="Image is empty."
+            )
+
+        if len(image_bytes) > 8 * 1024 * 1024:
+            raise HTTPException(
+                status_code=413,
+                detail="Image is too large. Please select a smaller image."
+            )
+
         encoded_image = base64.b64encode(
             image_bytes
         ).decode("utf-8")
 
-        response = client.chat.completions.create(
-            model="qwen/qwen3.6-27b",
-            messages=[
-                {
-                    "role": "system",
-                    "content": """
-You are a cautious visual health screening assistant.
+        mime_type = file.content_type or "image/jpeg"
 
-You must NOT diagnose diseases.
+        prompt = """
+You are Vission Health's cautious visual health
+screening assistant.
 
-Analyze only visible characteristics
-that can reasonably be observed from the image.
+Analyze ONLY what is visibly present in the image.
+
+You must NOT:
+- diagnose a disease
+- prescribe medicine
+- identify a medicine from an unclear image
+- invent symptoms
+- invent findings
+- give dosage instructions
 
 Return ONLY valid JSON.
 
@@ -623,65 +639,122 @@ Required format:
   "disclaimer": "This is a screening aid and not a diagnosis."
 }
 
-Urgency must be one of:
+Urgency must be exactly one of:
 
 LOW
 MEDIUM
 URGENT
 UNKNOWN
 
-If the image is unclear, blurry, poorly lit,
-or unsuitable for screening:
+If the image is blurry, dark, cropped,
+unclear, or unsuitable for visual screening:
 
-image_quality_good = false
-urgency = UNKNOWN
+- image_quality_good = false
+- urgency = UNKNOWN
+- observation should explain that the image is unclear
+- do not guess
 
-Never invent findings.
-Never prescribe medication.
-""",
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": """
-Assess the image for visible health-related
-observations only. Do not diagnose.
-Return the result as JSON.
-""",
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url":
-                                f"data:{file.content_type};base64,{encoded_image}"
+Keep the response concise.
+"""
+
+        def call_groq():
+            return client.chat.completions.create(
+                model="meta-llama/llama-4-scout-17b-16e-instruct",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": prompt,
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    "Analyze this image for visible "
+                                    "health-related information only. "
+                                    "Return JSON only."
+                                ),
                             },
-                        },
-                    ],
-                },
-            ],
-            temperature=0,
-            response_format={"type": "json_object"},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": (
+                                        f"data:{mime_type};base64,"
+                                        f"{encoded_image}"
+                                    )
+                                },
+                            },
+                        ],
+                    },
+                ],
+                temperature=0,
+                max_tokens=400,
+            )
+
+        response = await asyncio.wait_for(
+            asyncio.to_thread(call_groq),
+            timeout=70,
         )
 
         content = response.choices[0].message.content
 
-        data = json.loads(content)
+        if not content:
+            raise HTTPException(
+                status_code=502,
+                detail="Vision AI returned an empty response."
+            )
+
+        cleaned = (
+            content
+            .replace("```json", "")
+            .replace("```", "")
+            .strip()
+        )
+
+        data = json.loads(cleaned)
+
+        if not isinstance(data, dict):
+            raise HTTPException(
+                status_code=502,
+                detail="Vision AI returned an invalid result."
+            )
+
+        data.setdefault("image_quality_good", False)
+        data.setdefault("observation", "")
+        data.setdefault("visible_indicators", [])
+        data.setdefault("urgency", "UNKNOWN")
+        data.setdefault("recommendation", "")
+        data.setdefault(
+            "disclaimer",
+            "This is a screening aid and not a diagnosis."
+        )
 
         return {
             "success": True,
             "data": data,
         }
 
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "Vision AI took too long to respond. "
+                "Please try a clearer or smaller image."
+            )
+        )
+
     except json.JSONDecodeError:
         raise HTTPException(
-            status_code=500,
+            status_code=502,
             detail="Vision AI returned invalid JSON."
         )
+
+    except HTTPException:
+        raise
 
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=f"Vision analysis failed: {str(e)}"
         )

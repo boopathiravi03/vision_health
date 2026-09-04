@@ -11,6 +11,8 @@ import '../voice/voice_to_form_screen.dart';
 import '../qr/qr_scanner_screen.dart';
 import '../health_assistant/health_assistant_screen.dart';
 import '../patient/health_passport_screen.dart';
+import '../patient_portal/patient_health_records_screen.dart';
+import '../patient_portal/patient_care_instructions_screen.dart';
 
 class AshaDashboard extends StatefulWidget {
   const AshaDashboard({super.key});
@@ -80,6 +82,93 @@ class _AshaDashboardState extends State<AshaDashboard> {
         context,
       ).showSnackBar(SnackBar(content: Text('Demo patient setup failed: $e')));
     }
+  }
+
+  void _showPatientOptions(
+    BuildContext context,
+    String patientId,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(20),
+        ),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 18),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const Text(
+                  'Patient QR Scanned',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Patient ID: $patientId',
+                  style: const TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 18),
+                ListTile(
+                  leading: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF087F73)),
+                  title: const Text('Health Passport'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => HealthPassportScreen(patientId: patientId),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.history_rounded, color: Color(0xFF6A1B9A)),
+                  title: const Text('Health Records'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PatientHealthRecordsScreen(patientId: patientId),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.medical_information_rounded, color: Color(0xFFE65100)),
+                  title: const Text('Care Instructions'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PatientCareInstructionsScreen(patientId: patientId),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -434,7 +523,14 @@ class _AshaDashboardState extends State<AshaDashboard> {
             () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+                MaterialPageRoute(
+                  builder: (_) => QrScannerScreen(
+                    onScanned: (patientId) {
+                      if (!mounted) return;
+                      _showPatientOptions(context, patientId);
+                    },
+                  ),
+                ),
               );
             },
           ),

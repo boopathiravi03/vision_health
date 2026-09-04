@@ -1,17 +1,18 @@
-import 'dart:convert';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SchemeHospitalMapScreen extends StatefulWidget {
   final Map<String, dynamic> scheme;
+  final String patientLocation;
 
   const SchemeHospitalMapScreen({
     super.key,
     required this.scheme,
+    this.patientLocation = 'Chennai',
   });
 
   @override
@@ -19,540 +20,716 @@ class SchemeHospitalMapScreen extends StatefulWidget {
       _SchemeHospitalMapScreenState();
 }
 
-class _SchemeHospitalMapScreenState extends State<SchemeHospitalMapScreen> {
-  static const _teal = Color(0xFF087F73);
-  static const _defaultCenter = LatLng(13.0827, 80.2707); // Chennai fallback.
-
-  LatLng _userLocation = _defaultCenter;
-  bool _locationLoading = true;
-  bool _hospitalLoading = true;
-  String? _message;
-  List<_Hospital> _hospitals = [];
+class _SchemeHospitalMapScreenState
+    extends State<SchemeHospitalMapScreen> {
   final MapController _mapController = MapController();
+
+  bool _showFacilities = true;
+
+  LatLng _patientLocation = const LatLng(
+    13.0827,
+    80.2707,
+  );
+
+  late List<_DemoHospital> _hospitals;
 
   @override
   void initState() {
     super.initState();
-    _loadLocationAndHospitals();
+
+    _hospitals = _demoHospitals();
   }
 
-  Future<void> _loadLocationAndHospitals() async {
-    try {
-      final location = await _getUserLocation();
-      if (mounted) {
-        setState(() {
-          _userLocation = location;
-          _locationLoading = false;
-        });
-      }
-      await _loadHospitals(location);
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _locationLoading = false;
-          _message = 'Location permission was not available. Showing hospitals around Chennai.';
-        });
-      }
-      await _loadHospitals(_defaultCenter);
-    }
-  }
-
-  Future<LatLng> _getUserLocation() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return _defaultCenter;
-
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      return _defaultCenter;
-    }
-
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
+  List<_DemoHospital> _demoHospitals() {
+    return [
+      const _DemoHospital(
+        name: 'Demo Government Hospital',
+        type: 'Government Hospital',
+        address: 'Chennai Central Area',
+        location: LatLng(
+          13.0827,
+          80.2707,
+        ),
+        schemeSupported: true,
       ),
-    );
-    return LatLng(position.latitude, position.longitude);
+      const _DemoHospital(
+        name: 'Demo Primary Health Centre',
+        type: 'PHC',
+        address: 'Anna Nagar, Chennai',
+        location: LatLng(
+          13.0850,
+          80.2101,
+        ),
+        schemeSupported: true,
+      ),
+      const _DemoHospital(
+        name: 'Demo District Hospital',
+        type: 'District Hospital',
+        address: 'Egmore, Chennai',
+        location: LatLng(
+          13.0732,
+          80.2609,
+        ),
+        schemeSupported: true,
+      ),
+      const _DemoHospital(
+        name: 'Demo Community Health Centre',
+        type: 'Community Health Centre',
+        address: 'Guindy, Chennai',
+        location: LatLng(
+          13.0067,
+          80.2206,
+        ),
+        schemeSupported: true,
+      ),
+    ];
   }
 
-  Future<void> _loadHospitals(LatLng center) async {
-    setState(() => _hospitalLoading = true);
-
-    try {
-      final query = '''
-[out:json][timeout:15];
-nwr["amenity"="hospital"](around:8000,${center.latitude},${center.longitude});
-out center tags;
-''';
-
-      final response = await http.post(
-        Uri.parse('https://overpass-api.de/api/interpreter'),
-        headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {'data': query},
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Hospital map service unavailable');
-      }
-
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final elements = (json['elements'] as List<dynamic>? ?? []);
-
-      final hospitals = <_Hospital>[];
-      for (final item in elements) {
-        final data = Map<String, dynamic>.from(item as Map);
-        final tags = Map<String, dynamic>.from(
-          data['tags'] as Map? ?? const {},
-        );
-        final lat = (data['lat'] ?? data['center']?['lat']);
-        final lon = (data['lon'] ?? data['center']?['lon']);
-        if (lat is num && lon is num) {
-          hospitals.add(
-            _Hospital(
-              name: tags['name']?.toString().trim().isNotEmpty == true
-                  ? tags['name'].toString()
-                  : 'Nearby Hospital',
-              location: LatLng(lat.toDouble(), lon.toDouble()),
-              address: tags['addr:street']?.toString() ?? '',
-              phone: tags['phone']?.toString() ?? '',
-            ),
-          );
-        }
-      }
-
-      hospitals.sort(
-        (a, b) => _distance(center, a.location)
-            .compareTo(_distance(center, b.location)),
-      );
-
-      if (mounted) {
-        setState(() {
-          _hospitals = hospitals.take(12).toList();
-          _hospitalLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _hospitalLoading = false;
-          _message = 'Could not load live hospital data. Please verify hospitals with the PHC.';
-        });
-      }
-    }
-  }
-
-  double _distance(LatLng a, LatLng b) {
-    return const Distance().as(LengthUnit.Kilometer, a, b);
-  }
-
-  String _distanceText(LatLng point) {
-    final km = _distance(_userLocation, point);
-    return km < 1 ? '${(km * 1000).round()} m away' : '${km.toStringAsFixed(1)} km away';
+  String get schemeName {
+    return widget.scheme['name']?.toString() ??
+        'Selected Government Scheme';
   }
 
   @override
   Widget build(BuildContext context) {
-    final schemeName =
-        widget.scheme['name']?.toString() ?? 'Health Insurance Scheme';
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F9F8),
       appBar: AppBar(
-        title: const Text('Hospitals & Registration'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(
+          color: Colors.black,
+        ),
+        title: const Text(
+          'Hospitals & Registration',
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ),
       body: Column(
         children: [
-          SizedBox(
-            height: 330,
-            child: Stack(
-              children: [
-                FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: _userLocation,
-                    initialZoom: 12.5,
-                    interactionOptions: const InteractionOptions(
-                      flags: InteractiveFlag.all,
-                    ),
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.example.vission_health',
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: _userLocation,
-                          width: 48,
-                          height: 48,
-                          child: const Icon(
-                            Icons.my_location,
-                            color: Colors.blue,
-                            size: 34,
-                          ),
-                        ),
-                        ..._hospitals.map(
-                          (hospital) => Marker(
-                            point: hospital.location,
-                            width: 46,
-                            height: 46,
-                            child: GestureDetector(
-                              onTap: () => _showHospital(hospital, schemeName),
-                              child: const Icon(
-                                Icons.location_on,
-                                color: _teal,
-                                size: 42,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    RichAttributionWidget(
-                      attributions: [
-                        TextSourceAttribution(
-                          'OpenStreetMap contributors',
-                          onTap: () => launchUrl(
-                            Uri.parse('https://www.openstreetmap.org/copyright'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                Positioned(
-                  right: 14,
-                  bottom: 14,
-                  child: FloatingActionButton.small(
-                    backgroundColor: Colors.white,
-                    foregroundColor: _teal,
-                    onPressed: () {
-                      _mapController.move(_userLocation, 13);
-                    },
-                    child: const Icon(Icons.my_location),
-                  ),
-                ),
-                if (_locationLoading || _hospitalLoading)
-                  const Positioned(
-                    top: 12,
-                    left: 12,
-                    child: Card(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                            SizedBox(width: 8),
-                            Text('Finding nearby hospitals...'),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          if (_message != null)
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF8E1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                _message!,
-                style: const TextStyle(fontSize: 12, height: 1.4),
-              ),
-            ),
+          _topSchemeCard(),
+
           Expanded(
-            child: _hospitalLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _hospitals.isEmpty
-                    ? _emptyHospitals()
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _hospitals.length,
-                        itemBuilder: (_, index) {
-                          final hospital = _hospitals[index];
-                          return _hospitalCard(hospital, schemeName);
-                        },
-                      ),
+            child: _showFacilities
+                ? _mapAndList()
+                : _mapOnly(),
           ),
         ],
       ),
     );
   }
 
-  Widget _hospitalCard(_Hospital hospital, String schemeName) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: Color(0xFFE0E9E6)),
+  Widget _topSchemeCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        20,
+        16,
+        20,
+        18,
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () => _showHospital(hospital, schemeName),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F6F3),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.local_hospital,
-                  color: _teal,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      hospital.name,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _distanceText(hospital.location),
-                      style: const TextStyle(color: _teal),
-                    ),
-                    if (hospital.address.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        hospital.address,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right),
-            ],
+      color: const Color(0xFFE1F3EF),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.account_balance,
+              color: Color(0xFF087F73),
+              size: 32,
+            ),
           ),
-        ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Selected Scheme',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  schemeName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _emptyHospitals() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.local_hospital_outlined, size: 54, color: _teal),
-            const SizedBox(height: 12),
-            const Text(
-              'No nearby hospitals found',
-              style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+  Widget _mapAndList() {
+    return Column(
+      children: [
+        SizedBox(
+          height: 310,
+          child: _map(),
+        ),
+
+        Expanded(
+          child: _hospitalList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _mapOnly() {
+    return _map();
+  }
+
+  Widget _map() {
+    final markers = <Marker>[
+      Marker(
+        point: _patientLocation,
+        width: 60,
+        height: 60,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.20),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.my_location,
+            color: Color(0xFF087F73),
+            size: 34,
+          ),
+        ),
+      ),
+    ];
+
+    for (final hospital in _hospitals) {
+      markers.add(
+        Marker(
+          point: hospital.location,
+          width: 54,
+          height: 60,
+          child: GestureDetector(
+            onTap: () {
+              _showHospitalDetails(hospital);
+            },
+            child: Column(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: hospital.schemeSupported
+                        ? const Color(0xFF087F73)
+                        : Colors.red,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.20),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.local_hospital,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Please check with your PHC or search the map manually.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey, height: 1.4),
+          ),
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: _patientLocation,
+            initialZoom: 12.5,
+            minZoom: 5,
+            maxZoom: 18,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate:
+                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName:
+                  'com.vissionhealth.app',
+            ),
+
+            MarkerLayer(
+              markers: markers,
+            ),
+
+            RichAttributionWidget(
+              attributions: [
+                TextSourceAttribution(
+                  'OpenStreetMap contributors',
+                ),
+              ],
             ),
           ],
         ),
-      ),
+
+        Positioned(
+          right: 16,
+          top: 16,
+          child: Column(
+            children: [
+              _mapButton(
+                icon: Icons.my_location,
+                onPressed: () {
+                  _mapController.move(
+                    _patientLocation,
+                    14,
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              _mapButton(
+                icon: Icons.add,
+                onPressed: () {
+                  _mapController.move(
+                    _patientLocation,
+                    15,
+                  );
+                },
+              ),
+              const SizedBox(height: 6),
+              _mapButton(
+                icon: Icons.remove,
+                onPressed: () {
+                  _mapController.move(
+                    _patientLocation,
+                    10,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+
+        Positioned(
+          left: 16,
+          bottom: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 9,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.location_on,
+                  color: Color(0xFF087F73),
+                  size: 18,
+                ),
+                SizedBox(width: 6),
+                Text(
+                  'Patient location',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  void _showHospital(_Hospital hospital, String schemeName) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      builder: (_) => SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  const CircleAvatar(
-                    radius: 28,
-                    backgroundColor: Color(0xFFE8F6F3),
-                    child: Icon(Icons.local_hospital, color: _teal, size: 30),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      hospital.name,
-                      style: const TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '${_distanceText(hospital.location)} • $schemeName',
-                style: const TextStyle(color: _teal),
-              ),
-              if (hospital.address.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(hospital.address),
-              ],
-              const SizedBox(height: 20),
-              _section(
-                'How to register',
-                const [
-                  'Check your eligibility and carry the required documents.',
-                  'Visit the hospital scheme/help desk or the official government portal.',
-                  'Ask the staff to verify your scheme eligibility before treatment.',
-                  'Complete verification/registration and keep the acknowledgement or scheme ID.',
-                ],
-              ),
-              _section(
-                'What you can expect',
-                const [
-                  'The hospital can confirm whether it is currently authorised for the scheme.',
-                  'Covered services depend on the official scheme rules and your eligibility.',
-                  'The hospital will explain any documents, approvals or charges before treatment.',
-                  'For emergencies, seek immediate medical care and verify scheme formalities as soon as possible.',
-                ],
-              ),
-              _section(
-                'Documents to keep ready',
-                _documents(),
-              ),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(13),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF8E1),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Text(
-                  'Important: Vission Health only provides guidance. Hospital empanelment, eligibility, coverage and current rules must be confirmed with the official scheme authority or hospital.',
-                  style: TextStyle(fontSize: 12, height: 1.45),
-                ),
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () => _openDirections(hospital),
-                  icon: const Icon(Icons.directions),
-                  label: const Text('GET DIRECTIONS'),
-                ),
-              ),
-            ],
+  Widget _mapButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return Material(
+      elevation: 5,
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          width: 52,
+          height: 52,
+          child: Icon(
+            icon,
+            color: const Color(0xFF087F73),
           ),
         ),
       ),
     );
   }
 
-  List<String> _documents() {
-    final docs = widget.scheme['documents'];
-    if (docs is List && docs.isNotEmpty) {
-      return docs.map((e) => e.toString()).toList();
-    }
-    return const [
-      'Government identity document',
-      'Address proof',
-      'Income/category certificate if required',
-      'Existing health/scheme card if available',
-      'Relevant medical records',
-    ];
-  }
+  Widget _hospitalList() {
+    return Container(
+      color: const Color(0xFFF5F9F8),
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(
+          16,
+          14,
+          16,
+          24,
+        ),
+        itemCount: _hospitals.length,
+        itemBuilder: (context, index) {
+          final hospital = _hospitals[index];
 
-  Widget _section(String title, List<String> items) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
+          final distance = _distance(
+            _patientLocation,
+            hospital.location,
+          );
+
+          return Container(
+            margin: const EdgeInsets.only(
+              bottom: 12,
             ),
-          ),
-          const SizedBox(height: 8),
-          ...items.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 7),
-              child: Row(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFFE0E9E6),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.check_circle, size: 18, color: _teal),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(item, style: const TextStyle(height: 1.35))),
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE1F3EF),
+                          borderRadius:
+                              BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.local_hospital,
+                          color: Color(0xFF087F73),
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              hospital.name,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight:
+                                    FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              hospital.type,
+                              style: const TextStyle(
+                                color: Color(0xFF087F73),
+                                fontWeight:
+                                    FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  Text(
+                    hospital.address,
+                    style: const TextStyle(
+                      color: Colors.black54,
+                    ),
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  Text(
+                    _formatDistance(distance),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            _showHospitalDetails(
+                              hospital,
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.info_outline,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'DETAILS',
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () {
+                            _openDirections(
+                              hospital,
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.directions,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'DIRECTIONS',
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor:
+                                const Color(0xFF087F73),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
-  Future<void> _openDirections(_Hospital hospital) async {
-    final uri = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=${hospital.location.latitude},${hospital.location.longitude}',
+  void _showHospitalDetails(
+    _DemoHospital hospital,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hospital.name,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                Text(
+                  hospital.type,
+                  style: const TextStyle(
+                    color: Color(0xFF087F73),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                Text(
+                  hospital.address,
+                ),
+
+                const SizedBox(height: 14),
+
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F6F3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.verified_outlined,
+                        color: Color(0xFF087F73),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Demo facility for Vission Health presentation. Verify actual scheme participation before visiting.',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _openDirections(hospital);
+                    },
+                    icon: const Icon(
+                      Icons.directions,
+                    ),
+                    label: const Text(
+                      'GET DIRECTIONS',
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor:
+                          const Color(0xFF087F73),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _openDirections(
+    _DemoHospital hospital,
+  ) async {
+    final uri = Uri.parse(
+      'https://www.openstreetmap.org/directions'
+      '?engine=fossgis_osrm_car'
+      '&route=${_patientLocation.latitude},'
+      '${_patientLocation.longitude};'
+      '${hospital.location.latitude},'
+      '${hospital.location.longitude}',
+    );
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to open directions.',
+          ),
+        ),
+      );
+    }
+  }
+
+  double _distance(
+    LatLng a,
+    LatLng b,
+  ) {
+    const earthRadius = 6371000.0;
+
+    final lat1 =
+        a.latitude * math.pi / 180;
+
+    final lat2 =
+        b.latitude * math.pi / 180;
+
+    final deltaLat =
+        (b.latitude - a.latitude) *
+            math.pi /
+            180;
+
+    final deltaLon =
+        (b.longitude - a.longitude) *
+            math.pi /
+            180;
+
+    final h =
+        math.sin(deltaLat / 2) *
+                math.sin(deltaLat / 2) +
+            math.cos(lat1) *
+                math.cos(lat2) *
+                math.sin(deltaLon / 2) *
+                math.sin(deltaLon / 2);
+
+    final c = 2 *
+        math.atan2(
+          math.sqrt(h),
+          math.sqrt(1 - h),
+        );
+
+    return earthRadius * c;
+  }
+
+  String _formatDistance(
+    double meters,
+  ) {
+    if (meters < 1000) {
+      return '${meters.round()} m away';
+    }
+
+    return '${(meters / 1000).toStringAsFixed(1)} km away';
   }
 }
 
-class _Hospital {
+class _DemoHospital {
   final String name;
-  final LatLng location;
+  final String type;
   final String address;
-  final String phone;
+  final LatLng location;
+  final bool schemeSupported;
 
-  const _Hospital({
+  const _DemoHospital({
     required this.name,
+    required this.type,
+    required this.address,
     required this.location,
-    this.address = '',
-    this.phone = '',
+    required this.schemeSupported,
   });
 }
