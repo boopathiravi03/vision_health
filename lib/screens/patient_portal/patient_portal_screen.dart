@@ -361,8 +361,10 @@ class _PatientPortalScreenState extends State<PatientPortalScreen> {
 
     if (!context.mounted) return;
 
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      '/login',
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => const PatientPortalAccessScreen(),
+      ),
       (route) => false,
     );
   }
