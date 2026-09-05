@@ -35,9 +35,9 @@ class _PatientAiScannerScreenState
     try {
       final image = await _picker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 65,
-        maxWidth: 1280,
-        maxHeight: 1280,
+        imageQuality: 90,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
 
       if (image == null) return;
@@ -56,9 +56,9 @@ class _PatientAiScannerScreenState
     try {
       final image = await _picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 65,
-        maxWidth: 1280,
-        maxHeight: 1280,
+        imageQuality: 90,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
 
       if (image == null) return;
@@ -487,20 +487,29 @@ class _PatientAiScannerScreenState
     final medicineType =
         _value(result['medicine_type'], 'Medicine');
 
-    final whatItIs =
-        _value(result['what_it_is'], 'Not available');
+    final whatItIs = _value(
+      result['what_it_is'] ??
+          result['what_it_appears_to_be'],
+      medicineName == 'Not clearly identified'
+          ? 'Not available'
+          : medicineName,
+    );
 
-    final usedFor =
-        _value(result['what_it_is_used_for'], 'Not available');
+    final usedFor = _value(
+      result['what_it_is_used_for'] ??
+          result['what_it_appears_to_be_for'],
+      'General use information is not available.',
+    );
 
     final whenToTake = _value(
-      result['when_to_take'],
-      'Not shown on the image; follow the prescription or package label.',
+      result['when_to_take'] ??
+          result['instructions_visible'],
+      'Not shown on the package; follow the prescription or package label.',
     );
 
     final howToTake = _value(
       result['how_to_take'],
-      'Not shown on the image; follow the prescription or package label.',
+      'Follow the prescription or package label.',
     );
 
     final explanation =

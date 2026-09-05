@@ -473,7 +473,7 @@ async def medicine_analyze(
                 detail="Image is empty."
             )
 
-        if len(image_bytes) > 8 * 1024 * 1024:
+        if len(image_bytes) > 20 * 1024 * 1024:
             raise HTTPException(
                 status_code=413,
                 detail="Image is too large. Please select a smaller image."
@@ -486,68 +486,101 @@ async def medicine_analyze(
         mime_type = file.content_type or "image/jpeg"
 
         prompt = """
-You are Vission Health's medicine package information assistant.
+You are Vission Health's medicine package reading assistant.
 
-Carefully examine the medicine strip, box or package.
+Carefully inspect the medicine strip, box or package in the image.
 
-Return ONLY ONE JSON OBJECT.
+IMPORTANT:
+- If the medicine brand/product name is clearly readable, identify it.
+- Do NOT return "not clearly identified" when the brand is readable.
+- Read the large brand name and the smaller composition text.
+- Read strength and dosage information only when visibly printed.
+- Use the visible medicine identity to explain its GENERAL common purpose.
+- Do not diagnose the patient.
+- Do not prescribe.
+- Do not invent dosage or timing.
+- Never tell the patient to start, stop or change a medicine.
+- If timing is not printed, clearly say it is not shown.
+- Do not output reasoning.
+- Do not output think tags.
 
-Do not use markdown.
-Do not use ```json.
-Do not write explanations outside JSON.
+Return ONLY ONE valid JSON object.
 
-Use exactly these fields:
+Use EXACTLY this structure:
 
 {
   "medicine_name": "",
   "strength": "",
   "medicine_type": "",
-  "what_it_appears_to_be_for": "",
-  "instructions_visible": "",
-  "confidence": "LOW",
+  "what_it_is": "",
+  "what_it_is_used_for": "",
+  "when_to_take": "",
+  "how_to_take": "",
+  "common_side_effects": [],
+  "warnings": [],
+  "image_quality_good": true,
+  "confidence": "HIGH",
   "needs_verification": true,
   "simple_explanation": "",
   "warning": "",
   "visible_text": ""
 }
 
-IMPORTANT RULES:
+Rules:
 
-1. Read ONLY information visible in the image.
-2. medicine_name must be the clearly readable brand/product name.
-3. strength must be copied from the package if visible.
-4. medicine_type can be tablet, capsule, syrup, etc. only when clear.
-5. what_it_appears_to_be_for should describe the GENERAL COMMON USE
-   only when the medicine identity is confidently readable.
-6. Do NOT diagnose the patient.
-7. Do NOT prescribe the medicine.
-8. Do NOT tell the patient to start, stop or change the medicine.
-9. Do NOT invent dosage.
-10. Do NOT invent timing.
-11. instructions_visible must contain dosage/timing ONLY if explicitly
-    printed and readable in the image.
-12. confidence must be LOW, MEDIUM or HIGH.
-13. needs_verification should normally be true.
-14. simple_explanation should explain the general purpose in simple language.
-15. warning should advise verification with a doctor, pharmacist or ASHA worker.
-16. visible_text should contain important readable text from the package.
-17. If the package is unclear, return empty medicine_name and LOW confidence.
-18. Never guess.
+1. medicine_name:
+   Copy the clearly readable brand/product name.
 
-Example:
+2. strength:
+   Copy the visible strength or composition.
 
-{
-  "medicine_name": "Example Tablet",
-  "strength": "10 mg",
-  "medicine_type": "tablet",
-  "what_it_appears_to_be_for": "general allergy symptom relief",
-  "instructions_visible": "",
-  "confidence": "HIGH",
-  "needs_verification": true,
-  "simple_explanation": "This medicine is generally used to relieve allergy-related symptoms.",
-  "warning": "Confirm the medicine and prescribed dose with a pharmacist or doctor.",
-  "visible_text": "Example Tablet 10 mg"
-}
+3. medicine_type:
+   Use tablet/capsule/syrup/etc. only when clear.
+
+4. what_it_is:
+   Briefly describe the medicine using visible composition.
+
+5. what_it_is_used_for:
+   Give only the GENERAL common purpose when the medicine identity
+   is clearly readable.
+
+6. when_to_take:
+   Use timing ONLY if printed on the package.
+   Otherwise:
+   "Not shown on the package; follow the prescription or package label."
+
+7. how_to_take:
+   Use instructions ONLY if visible.
+   Otherwise:
+   "Follow the prescription or package label."
+
+8. common_side_effects:
+   Use [] unless side effects are explicitly printed on the package.
+
+9. warnings:
+   Include clearly visible package warnings.
+
+10. image_quality_good:
+    true when the medicine information is readable.
+
+11. confidence:
+    HIGH, MEDIUM or LOW only.
+
+12. needs_verification:
+    Always true.
+
+13. simple_explanation:
+    Explain the medicine information simply.
+
+14. warning:
+    Tell the user to verify the medicine, strength and instructions
+    with a doctor, pharmacist or ASHA worker.
+
+15. visible_text:
+    Include important readable text from the package.
+    Never include AI reasoning.
+
+Prioritize medicine-name and composition OCR accuracy.
 """
 
         def call_groq():
@@ -565,8 +598,9 @@ Example:
                                 "type": "text",
                                 "text": (
                                     "Read this medicine package carefully. "
-                                    "Return exactly one JSON object using the "
-                                    "required fields."
+                                    "Identify the clearly visible brand name "
+                                    "and composition. Return ONLY the requested "
+                                    "JSON object."
                                 ),
                             },
                             {
@@ -582,7 +616,11 @@ Example:
                     },
                 ],
                 temperature=0,
-                max_completion_tokens=700,
+                max_completion_tokens=800,
+                reasoning_effort="none",
+                response_format={
+                    "type": "json_object"
+                },
             )
 
         response = await asyncio.wait_for(
@@ -600,13 +638,22 @@ Example:
 
         cleaned = content.strip()
 
-        # Remove markdown fences if model accidentally adds them.
-        if "```json" in cleaned:
-            cleaned = cleaned.replace("```json", "")
+        # Remove accidental reasoning.
+        if "<think>" in cleaned:
+            cleaned = cleaned.split(
+                "<think>",
+                1
+            )[0].strip()
 
-        cleaned = cleaned.replace("```", "").strip()
+        # Remove accidental markdown fences.
+        cleaned = cleaned.replace(
+            "```json",
+            ""
+        ).replace(
+            "```",
+            ""
+        ).strip()
 
-        # Extract JSON object if model added a small prefix/suffix.
         first = cleaned.find("{")
         last = cleaned.rfind("}")
 
@@ -617,26 +664,10 @@ Example:
             data = json.loads(cleaned)
 
         except json.JSONDecodeError:
-
-            # Safe fallback for demo.
-            data = {
-                "medicine_name": "",
-                "strength": "",
-                "medicine_type": "",
-                "what_it_appears_to_be_for": "",
-                "instructions_visible": "",
-                "confidence": "LOW",
-                "needs_verification": True,
-                "simple_explanation": (
-                    "The medicine package could not be read reliably "
-                    "from this image."
-                ),
-                "warning": (
-                    "Please verify the medicine, strength and instructions "
-                    "with a pharmacist, doctor or ASHA worker."
-                ),
-                "visible_text": cleaned[:1000],
-            }
+            raise HTTPException(
+                status_code=502,
+                detail="Vision AI returned invalid JSON."
+            )
 
         if not isinstance(data, dict):
             raise HTTPException(
@@ -644,8 +675,95 @@ Example:
                 detail="Vision AI returned an invalid result."
             )
 
-        confidence = str(
-            data.get("confidence") or "LOW"
+        def clean_text(value):
+            if value is None:
+                return ""
+
+            value = str(value).strip()
+
+            if "<think>" in value:
+                value = value.split(
+                    "<think>",
+                    1
+                )[0].strip()
+
+            return value
+
+        medicine_name = clean_text(
+            data.get("medicine_name")
+        )
+
+        strength = clean_text(
+            data.get("strength")
+        )
+
+        medicine_type = clean_text(
+            data.get("medicine_type")
+        )
+
+        what_it_is = clean_text(
+            data.get("what_it_is")
+            or data.get("what_it_appears_to_be")
+        )
+
+        what_it_is_used_for = clean_text(
+            data.get("what_it_is_used_for")
+            or data.get("what_it_appears_to_be_for")
+        )
+
+        when_to_take = clean_text(
+            data.get("when_to_take")
+            or data.get("instructions_visible")
+        )
+
+        how_to_take = clean_text(
+            data.get("how_to_take")
+        )
+
+        if not when_to_take:
+            when_to_take = (
+                "Not shown on the package; "
+                "follow the prescription or package label."
+            )
+
+        if not how_to_take:
+            how_to_take = (
+                "Follow the prescription or package label."
+            )
+
+        side_effects = data.get(
+            "common_side_effects",
+            []
+        )
+
+        if not isinstance(side_effects, list):
+            side_effects = []
+
+        side_effects = [
+            clean_text(item)
+            for item in side_effects
+            if clean_text(item)
+        ]
+
+        warnings = data.get(
+            "warnings",
+            []
+        )
+
+        if not isinstance(warnings, list):
+            warnings = []
+
+        warnings = [
+            clean_text(item)
+            for item in warnings
+            if clean_text(item)
+        ]
+
+        confidence = clean_text(
+            data.get(
+                "confidence",
+                "LOW"
+            )
         ).upper()
 
         if confidence not in {
@@ -655,52 +773,68 @@ Example:
         }:
             confidence = "LOW"
 
+        visible_text = clean_text(
+            data.get("visible_text")
+        )
+
+        simple_explanation = clean_text(
+            data.get("simple_explanation")
+        )
+
+        if not simple_explanation:
+            if medicine_name:
+                simple_explanation = (
+                    f"{medicine_name} was identified from "
+                    "the visible package information."
+                )
+            else:
+                simple_explanation = (
+                    "The medicine package could not be read reliably "
+                    "from this image."
+                )
+
+        warning = clean_text(
+            data.get("warning")
+        )
+
+        if not warning:
+            warning = (
+                "Confirm the medicine, strength and instructions "
+                "with a doctor, pharmacist or ASHA worker."
+            )
+
         normalized = {
-            "medicine_name": str(
-                data.get("medicine_name") or ""
-            ),
-
-            "strength": str(
-                data.get("strength") or ""
-            ),
-
-            "medicine_type": str(
-                data.get("medicine_type") or ""
-            ),
-
-            "what_it_appears_to_be_for": str(
-                data.get("what_it_appears_to_be_for") or ""
-            ),
-
-            "instructions_visible": str(
-                data.get("instructions_visible") or ""
-            ),
-
-            "confidence": confidence,
-
-            "needs_verification": bool(
-                data.get(
-                    "needs_verification",
-                    True
+            "medicine_name": medicine_name,
+            "strength": strength,
+            "medicine_type": medicine_type,
+            "what_it_is": what_it_is,
+            "what_it_is_used_for": what_it_is_used_for,
+            "when_to_take": when_to_take,
+            "how_to_take": how_to_take,
+            "common_side_effects": side_effects,
+            "warnings": warnings,
+            "image_quality_good": (
+                True if medicine_name
+                else bool(
+                    data.get(
+                        "image_quality_good",
+                        False
+                    )
                 )
             ),
-
-            "simple_explanation": str(
-                data.get("simple_explanation")
-                or
-                "Please verify this medicine with a healthcare professional."
-            ),
-
-            "warning": str(
-                data.get("warning")
-                or
-                "Confirm the medicine with an ASHA worker, doctor or pharmacist."
-            ),
-
-            "visible_text": str(
-                data.get("visible_text") or ""
-            ),
+            "confidence": confidence,
+            "needs_verification": True,
+            "simple_explanation": simple_explanation,
+            "warning": warning,
+            "visible_text": visible_text,
         }
+
+        # If a readable medicine name exists, the package was readable.
+        if medicine_name:
+            normalized["image_quality_good"] = True
+
+            if normalized["confidence"] == "LOW":
+                normalized["confidence"] = "HIGH"
 
         return {
             "success": True,
