@@ -563,7 +563,7 @@ Rules:
                                 "text": (
                                     "Read this medicine package carefully. "
                                     "Extract only visible printed information. "
-                                    "Return JSON only."
+                                    "Return ONLY a JSON object matching the requested format."
                                 ),
                             },
                             {
@@ -579,7 +579,9 @@ Rules:
                     },
                 ],
                 temperature=0,
-                max_tokens=500,
+                max_completion_tokens=600,
+                reasoning_format="hidden",
+                response_format={"type": "json_object"},
             )
 
         response = await asyncio.wait_for(
@@ -595,12 +597,12 @@ Rules:
                 detail="Vision AI returned an empty response."
             )
 
-        cleaned = (
-            content
-            .replace("```json", "")
-            .replace("```", "")
-            .strip()
-        )
+        cleaned = content.strip()
+
+        if cleaned.startswith("```"):
+            cleaned = cleaned.replace("```json", "", 1)
+            cleaned = cleaned.replace("```", "", 1)
+            cleaned = cleaned.strip()
 
         data = json.loads(cleaned)
 
@@ -741,7 +743,8 @@ Keep the response concise.
                                 "text": (
                                     "Analyze this image for visible "
                                     "health-related information only. "
-                                    "Return JSON only."
+                                    "Return ONLY a JSON object "
+                                    "matching the requested format."
                                 ),
                             },
                             {
@@ -757,7 +760,9 @@ Keep the response concise.
                     },
                 ],
                 temperature=0,
-                max_tokens=400,
+                max_completion_tokens=500,
+                reasoning_format="hidden",
+                response_format={"type": "json_object"},
             )
 
         response = await asyncio.wait_for(
@@ -773,12 +778,12 @@ Keep the response concise.
                 detail="Vision AI returned an empty response."
             )
 
-        cleaned = (
-            content
-            .replace("```json", "")
-            .replace("```", "")
-            .strip()
-        )
+        cleaned = content.strip()
+
+        if cleaned.startswith("```"):
+            cleaned = cleaned.replace("```json", "", 1)
+            cleaned = cleaned.replace("```", "", 1)
+            cleaned = cleaned.strip()
 
         data = json.loads(cleaned)
 
