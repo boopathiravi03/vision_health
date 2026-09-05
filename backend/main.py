@@ -549,7 +549,7 @@ Rules:
 
         def call_groq():
             return client.chat.completions.create(
-                model="meta-llama/llama-4-scout-17b-16e-instruct",
+                model="qwen/qwen3.6-27b",
                 messages=[
                     {
                         "role": "system",
@@ -727,7 +727,7 @@ Keep the response concise.
 
         def call_groq():
             return client.chat.completions.create(
-                model="meta-llama/llama-4-scout-17b-16e-instruct",
+                model="qwen/qwen3.6-27b",
                 messages=[
                     {
                         "role": "system",
