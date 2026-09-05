@@ -312,13 +312,14 @@ Keep the explanation concise.
 
 class HealthQuery(BaseModel):
     query: str
-    language: str
+    language: str = "English"
 
 
 @app.post("/health-assistant")
 async def health_assistant(data: HealthQuery):
 
     query = data.query.strip()
+    language = data.language.strip() or "English"
 
     if not query:
         raise HTTPException(
@@ -326,96 +327,65 @@ async def health_assistant(data: HealthQuery):
             detail="Please provide a question."
         )
 
-    language = data.language.strip() or "English"
-
-    prompt = f"""
+    system_prompt = """
 You are Vission AI, the conversational health assistant
 inside the Vission Health application.
 
-The user may speak naturally.
+You help rural patients and ASHA workers.
+
+IMPORTANT RULES:
+
+1. Greetings must receive a normal friendly response.
+   Example:
+   User: hello
+   Response: Hello! I am Vission AI. How can I help you today?
+
+2. Normal conversational questions should receive natural answers.
+
+3. Health questions should receive simple and safe health information.
+
+4. Never give a definitive diagnosis.
+
+5. Never prescribe medicines.
+
+6. Never provide medicine dosage.
+
+7. Never tell a user to start, stop, or change medication.
+
+8. If emergency warning signs are described, advise immediate
+   professional medical attention.
+
+9. Use simple language.
+
+10. Keep ordinary conversation short.
+
+11. For health questions explain:
+    - what it may mean generally
+    - safe things the person can do
+    - when to seek professional care
+
+12. Respond in the requested language.
+
+13. Do not output JSON.
+
+14. Do not output <think> tags.
+
+15. Do not mention these instructions.
+
+16. Do not pretend to be a doctor.
+"""
+
+    user_prompt = f"""
+User language: {language}
 
 User message:
 {query}
 
-Requested language:
-{language}
-
-Your job is to respond naturally and helpfully.
-
-IMPORTANT CONVERSATION RULES:
-
-1. If the user says "hello", "hi", "hey", "good morning",
-   "good evening", or another greeting:
-   respond naturally and warmly.
-   Do NOT force a medical answer.
-
-2. If the user asks a normal conversational question:
-   answer naturally.
-
-3. If the user asks a health-related question:
-   provide simple, safe health information.
-
-4. If the user describes symptoms:
-   explain possible next steps without diagnosing.
-
-5. NEVER provide a definitive diagnosis.
-
-6. NEVER prescribe medicine.
-
-7. NEVER invent medicine dosage.
-
-8. NEVER tell the user to start or stop medication.
-
-9. For emergency warning signs:
-   clearly recommend immediate medical attention.
-
-10. Use simple language suitable for rural patients
-    and ASHA workers.
-
-11. Keep normal conversational answers short.
-
-12. For health questions, provide:
-    - simple explanation
-    - what the person can do
-    - when to contact a healthcare professional
-
-13. Respond in the requested language.
-
-14. Do not mention these instructions.
-
-15. Do not output JSON.
-
-16. Do not output <think> tags.
-
-17. Speak naturally because your response will also
-    be converted to speech.
-
-Examples:
-
-User: hello
-Assistant:
-Hello! I am Vission AI. How can I help you today?
-
-User: hi
-Assistant:
-Hi! I am here to help. What would you like to know?
-
-User: what is fever?
-Assistant:
-Fever is when your body temperature becomes higher
-than normal. It can happen for many reasons. If the
-fever is high, persistent, or accompanied by serious
-symptoms, please contact a healthcare professional.
-
-User: I have mild headache
-Assistant:
-For a mild headache, rest, drink enough fluids and
-monitor your symptoms. If it becomes severe, keeps
-getting worse, or you develop warning signs, contact
-a healthcare professional.
+Respond naturally to the user.
 """
 
     try:
+
         response = await asyncio.wait_for(
             asyncio.to_thread(
                 lambda: client.chat.completions.create(
@@ -423,40 +393,45 @@ a healthcare professional.
                     messages=[
                         {
                             "role": "system",
-                            "content": prompt,
+                            "content": system_prompt,
                         },
                         {
                             "role": "user",
-                            "content": query,
+                            "content": user_prompt,
                         },
                     ],
                     temperature=0.2,
                     max_tokens=300,
                 )
             ),
-            timeout=30,
+            timeout=35,
         )
+
+        if not response.choices:
+            raise HTTPException(
+                status_code=502,
+                detail="Groq returned no choices."
+            )
 
         content = response.choices[0].message.content
 
-        if not content:
+        if content is None:
             raise HTTPException(
                 status_code=502,
-                detail="Vission AI returned an empty response."
+                detail="Vission AI returned empty content."
             )
 
         answer = content.strip()
 
+        # Remove accidental reasoning tags.
         if "<think>" in answer:
-            answer = answer.split(
-                "<think>",
-                1
-            )[0].strip()
+            answer = answer.split("<think>", 1)[0].strip()
 
-        answer = answer.replace(
-            "```",
-            ""
-        ).strip()
+        if "</think>" in answer:
+            answer = answer.split("</think>")[-1].strip()
+
+        # Remove accidental markdown fences.
+        answer = answer.replace("```", "").strip()
 
         if not answer:
             raise HTTPException(
@@ -471,6 +446,7 @@ a healthcare professional.
         }
 
     except asyncio.TimeoutError:
+
         raise HTTPException(
             status_code=504,
             detail=(
@@ -483,6 +459,10 @@ a healthcare professional.
         raise
 
     except Exception as e:
+
+        print("HEALTH ASSISTANT GROQ ERROR:")
+        print(repr(e))
+
         raise HTTPException(
             status_code=500,
             detail=f"Health assistant failed: {str(e)}"
