@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -6,8 +7,8 @@ class HealthAssistantService {
   static const String baseUrl =
       'https://vision-health.onrender.com';
 
-  static const Duration requestTimeout =
-      Duration(seconds: 60);
+  static const Duration timeoutDuration =
+      Duration(seconds: 90);
 
   Future<String> askAssistant({
     required String query,
@@ -16,23 +17,12 @@ class HealthAssistantService {
     final cleanQuery = query.trim();
 
     if (cleanQuery.isEmpty) {
-      throw Exception(
-        'Please enter a question.',
-      );
+      throw Exception('Please enter a health question.');
     }
 
-    final uri = Uri.parse(
-      '$baseUrl/health-assistant',
-    );
+    final uri = Uri.parse('$baseUrl/health-assistant');
 
     try {
-      print('----------------------------------------');
-      print('VISSION HEALTH ASSISTANT');
-      print('URL: $uri');
-      print('QUERY: $cleanQuery');
-      print('LANGUAGE: $language');
-      print('----------------------------------------');
-
       final response = await http
           .post(
             uri,
@@ -45,48 +35,34 @@ class HealthAssistantService {
               'language': language,
             }),
           )
-          .timeout(requestTimeout);
+          .timeout(timeoutDuration);
 
-      print(
-        'Health Assistant HTTP status: '
-        '${response.statusCode}',
-      );
+      print('====================================');
+      print('VISSION HEALTH ASSISTANT');
+      print('STATUS: ${response.statusCode}');
+      print('BODY: ${response.body}');
+      print('====================================');
 
-      print(
-        'Health Assistant response: '
-        '${response.body}',
-      );
-
-      if (response.statusCode < 200 ||
-          response.statusCode >= 300) {
-        String serverMessage =
-            'Health Assistant server error '
-            '(${response.statusCode}).';
+      if (response.statusCode != 200) {
+        String message;
 
         try {
-          final errorData =
-              jsonDecode(response.body);
+          final errorBody = jsonDecode(response.body);
 
-          if (errorData is Map) {
-            final error = errorData['error'];
-
-            if (error is Map &&
-                error['message'] != null) {
-              serverMessage =
-                  error['message'].toString();
-            } else if (errorData['detail'] != null) {
-              serverMessage =
-                  errorData['detail'].toString();
-            } else if (errorData['message'] != null) {
-              serverMessage =
-                  errorData['message'].toString();
-            }
-          }
+          message =
+              errorBody['detail']?.toString() ??
+              errorBody['error']?.toString() ??
+              'Health Assistant server error.';
         } catch (_) {
-          // Response was not JSON.
+          message = response.body.isNotEmpty
+              ? response.body
+              : 'Health Assistant server error.';
         }
 
-        throw Exception(serverMessage);
+        throw Exception(
+          'Health Assistant error '
+          '${response.statusCode}: $message',
+        );
       }
 
       dynamic decoded;
@@ -95,108 +71,49 @@ class HealthAssistantService {
         decoded = jsonDecode(response.body);
       } catch (_) {
         throw Exception(
-          'The health assistant returned invalid JSON.',
+          'The server returned invalid JSON.',
         );
       }
 
       if (decoded is! Map) {
         throw Exception(
-          'The health assistant returned an invalid response.',
+          'Invalid Health Assistant response.',
         );
       }
 
-      String? answer;
+      final success = decoded['success'];
 
-      if (decoded['response'] != null) {
-        answer = decoded['response'].toString();
-      }
-
-      if ((answer == null || answer.trim().isEmpty) &&
-          decoded['answer'] != null) {
-        answer = decoded['answer'].toString();
-      }
-
-      if ((answer == null || answer.trim().isEmpty) &&
-          decoded['message'] != null) {
-        answer = decoded['message'].toString();
-      }
-
-      final data = decoded['data'];
-
-      if ((answer == null || answer.trim().isEmpty) &&
-          data is Map) {
-        if (data['response'] != null) {
-          answer = data['response'].toString();
-        } else if (data['answer'] != null) {
-          answer = data['answer'].toString();
-        } else if (data['message'] != null) {
-          answer = data['message'].toString();
-        }
-      }
-
-      if (answer == null || answer.trim().isEmpty) {
-        final backendError =
-            decoded['error'] ??
-            decoded['detail'];
-
-        if (backendError != null) {
-          if (backendError is Map &&
-              backendError['message'] != null) {
-            throw Exception(
-              backendError['message'].toString(),
-            );
-          }
-
-          throw Exception(
-            backendError.toString(),
-          );
-        }
-
+      if (success != true) {
         throw Exception(
-          'Health assistant returned an empty response.',
+          decoded['detail']?.toString() ??
+          decoded['error']?.toString() ??
+          decoded['response']?.toString() ??
+          'Health Assistant request failed.',
         );
       }
 
-      answer = answer.trim();
+      final answer =
+          decoded['response']?.toString().trim();
 
-      print(
-        'Health Assistant answer: $answer',
-      );
-
-      print('----------------------------------------');
+      if (answer == null || answer.isEmpty) {
+        throw Exception(
+          'Health Assistant returned an empty response.',
+        );
+      }
 
       return answer;
-    }
-
-    on http.ClientException catch (e) {
-      print(
-        'Health Assistant connection error: $e',
-      );
-
+    } on TimeoutException {
       throw Exception(
-        'Could not connect to Vission AI. '
-        'Please check your internet connection '
-        'and try again.',
+        'Vission AI is taking too long to respond. '
+        'Please try again.',
       );
-    }
-
-    on Exception catch (e) {
-      print(
-        'Health Assistant exception: $e',
+    } on http.ClientException catch (e) {
+      throw Exception(
+        'Unable to connect to Vission AI: $e',
       );
-
+    } catch (e) {
+      print('Health Assistant FAILED: $e');
       rethrow;
-    }
-
-    catch (e) {
-      print(
-        'Health Assistant unknown error: $e',
-      );
-
-      throw Exception(
-        'Something went wrong while contacting '
-        'Vission AI.',
-      );
     }
   }
 }
