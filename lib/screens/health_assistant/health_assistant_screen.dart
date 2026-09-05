@@ -26,6 +26,7 @@ class _HealthAssistantScreenState
   bool _loading = false;
   bool _isListening = false;
   bool _speaking = false;
+  bool _voiceSubmissionStarted = false;
 
   String? _response;
   String? _error;
@@ -40,7 +41,28 @@ class _HealthAssistantScreenState
   }
 
   Future<void> _initializeVoice() async {
-    await _voiceService.initialize();
+    await _voiceService.initialize(
+      onStatus: (status) {
+        if (!mounted) return;
+
+        if (status == 'notListening' ||
+            status == 'done') {
+          if (_isListening && !_loading) {
+            _finishVoiceInput();
+          }
+        }
+      },
+      onError: (error) {
+        if (!mounted) return;
+
+        if (_isListening) {
+          setState(() {
+            _isListening = false;
+          });
+        }
+      },
+    );
+
     await _voiceService.initializeTts();
   }
 
@@ -85,40 +107,71 @@ class _HealthAssistantScreenState
   // ------------------------------------------------------------
 
   Future<void> _startVoiceInput() async {
-    if (_loading) {
+    if (_loading || _isListening) {
       return;
     }
+
+    _listeningTimer?.cancel();
+
+    _voiceSubmissionStarted = false;
 
     setState(() {
       _error = null;
       _response = null;
+      _queryController.clear();
       _isListening = true;
     });
 
     final started = await _voiceService.startListening(
       localeId: _speechLocale(),
+
       onResult: (text) {
-        if (!mounted) {
+        if (!mounted) return;
+
+        final cleaned = text.trim();
+
+        if (cleaned.isEmpty) {
           return;
         }
 
-        if (text.trim().isNotEmpty) {
+        setState(() {
+          _queryController.text = cleaned;
+
+          _queryController.selection =
+              TextSelection.fromPosition(
+            TextPosition(
+              offset: cleaned.length,
+            ),
+          );
+        });
+      },
+
+      onStatus: (status) {
+        if (!mounted) return;
+
+        if ((status == 'done' ||
+                status == 'notListening') &&
+            _isListening &&
+            !_voiceSubmissionStarted) {
+          _finishVoiceInput();
+        }
+      },
+
+      onError: (error) {
+        if (!mounted) return;
+
+        if (!_voiceSubmissionStarted) {
           setState(() {
-            _queryController.text = text;
-            _queryController.selection =
-                TextSelection.fromPosition(
-              TextPosition(
-                offset: _queryController.text.length,
-              ),
-            );
+            _isListening = false;
+            _error =
+                'I could not understand the speech. '
+                'Please try again.';
           });
         }
       },
     );
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     if (!started) {
       setState(() {
@@ -131,20 +184,23 @@ class _HealthAssistantScreenState
       return;
     }
 
-    // Automatically stop listening after 15 seconds.
-    _listeningTimer?.cancel();
-
     _listeningTimer = Timer(
-      const Duration(seconds: 15),
+      const Duration(seconds: 20),
       () async {
-        if (_isListening) {
-          await _stopVoiceInput();
+        if (_isListening && !_voiceSubmissionStarted) {
+          await _finishVoiceInput();
         }
       },
     );
   }
 
-  Future<void> _stopVoiceInput() async {
+  Future<void> _finishVoiceInput() async {
+    if (_voiceSubmissionStarted) {
+      return;
+    }
+
+    _voiceSubmissionStarted = true;
+
     _listeningTimer?.cancel();
 
     await _voiceService.stopListening();
@@ -153,28 +209,30 @@ class _HealthAssistantScreenState
       return;
     }
 
+    final query = _queryController.text.trim();
+
     setState(() {
       _isListening = false;
     });
 
-    final query = _queryController.text.trim();
-
     if (query.isEmpty) {
+      _voiceSubmissionStarted = false;
+
       setState(() {
         _error =
-            'I could not hear a question. Please try speaking again.';
+            'I could not hear you clearly. '
+            'Please try again.';
       });
 
       return;
     }
 
-    // Automatically send the recognized question to AI.
     await _sendQuestion(query);
   }
 
   Future<void> _toggleVoice() async {
     if (_isListening) {
-      await _stopVoiceInput();
+      await _finishVoiceInput();
     } else {
       await _startVoiceInput();
     }

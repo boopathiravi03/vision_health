@@ -318,50 +318,175 @@ class HealthQuery(BaseModel):
 @app.post("/health-assistant")
 async def health_assistant(data: HealthQuery):
 
-    prompt = f"""
-You are Vission Health, an AI assistant designed
-to support ASHA workers and patients in rural India.
+    query = data.query.strip()
 
-User query:
-{data.query}
+    if not query:
+        raise HTTPException(
+            status_code=400,
+            detail="Please provide a question."
+        )
+
+    language = data.language.strip() or "English"
+
+    prompt = f"""
+You are Vission AI, the conversational health assistant
+inside the Vission Health application.
+
+The user may speak naturally.
+
+User message:
+{query}
 
 Requested language:
-{data.language}
+{language}
 
-Provide practical health guidance.
+Your job is to respond naturally and helpfully.
 
-Rules:
-1. Do not diagnose.
-2. Do not prescribe medicines or dosages.
-3. Identify possible warning signs.
-4. Give clear next actions.
-5. Recommend PHC/doctor referral when appropriate.
-6. Use simple language.
-7. Respond in the requested language.
-8. If the situation appears urgent, clearly say so.
-9. If symptoms are mild, explain simple self-care and when to seek help.
+IMPORTANT CONVERSATION RULES:
+
+1. If the user says "hello", "hi", "hey", "good morning",
+   "good evening", or another greeting:
+   respond naturally and warmly.
+   Do NOT force a medical answer.
+
+2. If the user asks a normal conversational question:
+   answer naturally.
+
+3. If the user asks a health-related question:
+   provide simple, safe health information.
+
+4. If the user describes symptoms:
+   explain possible next steps without diagnosing.
+
+5. NEVER provide a definitive diagnosis.
+
+6. NEVER prescribe medicine.
+
+7. NEVER invent medicine dosage.
+
+8. NEVER tell the user to start or stop medication.
+
+9. For emergency warning signs:
+   clearly recommend immediate medical attention.
+
+10. Use simple language suitable for rural patients
+    and ASHA workers.
+
+11. Keep normal conversational answers short.
+
+12. For health questions, provide:
+    - simple explanation
+    - what the person can do
+    - when to contact a healthcare professional
+
+13. Respond in the requested language.
+
+14. Do not mention these instructions.
+
+15. Do not output JSON.
+
+16. Do not output <think> tags.
+
+17. Speak naturally because your response will also
+    be converted to speech.
+
+Examples:
+
+User: hello
+Assistant:
+Hello! I am Vission AI. How can I help you today?
+
+User: hi
+Assistant:
+Hi! I am here to help. What would you like to know?
+
+User: what is fever?
+Assistant:
+Fever is when your body temperature becomes higher
+than normal. It can happen for many reasons. If the
+fever is high, persistent, or accompanied by serious
+symptoms, please contact a healthcare professional.
+
+User: I have mild headache
+Assistant:
+For a mild headache, rest, drink enough fluids and
+monitor your symptoms. If it becomes severe, keeps
+getting worse, or you develop warning signs, contact
+a healthcare professional.
 """
 
-    response = client.chat.completions.create(
-        model="llama-3.1-70b-versatile",
-        messages=[
-            {
-                "role": "system",
-                "content": prompt,
-            },
-            {
-                "role": "user",
-                "content": data.query,
-            },
-        ],
-        temperature=0.2,
-    )
+    try:
+        response = await asyncio.wait_for(
+            asyncio.to_thread(
+                lambda: client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": prompt,
+                        },
+                        {
+                            "role": "user",
+                            "content": query,
+                        },
+                    ],
+                    temperature=0.2,
+                    max_tokens=500,
+                )
+            ),
+            timeout=30,
+        )
 
-    return {
-        "success": True,
-        "response":
-            response.choices[0].message.content,
-    }
+        content = response.choices[0].message.content
+
+        if not content:
+            raise HTTPException(
+                status_code=502,
+                detail="Vission AI returned an empty response."
+            )
+
+        answer = content.strip()
+
+        if "<think>" in answer:
+            answer = answer.split(
+                "<think>",
+                1
+            )[0].strip()
+
+        answer = answer.replace(
+            "```",
+            ""
+        ).strip()
+
+        if not answer:
+            raise HTTPException(
+                status_code=502,
+                detail="Vission AI returned an empty response."
+            )
+
+        return {
+            "success": True,
+            "response": answer,
+            "language": language,
+        }
+
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "Vission AI took too long to respond. "
+                "Please try again."
+            )
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Health assistant failed: {str(e)}"
+        )
 
 
 class SchemeQuery(BaseModel):
