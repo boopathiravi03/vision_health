@@ -486,65 +486,68 @@ async def medicine_analyze(
         mime_type = file.content_type or "image/jpeg"
 
         prompt = """
-You are Vission Health's cautious medicine-package
-information assistant.
+You are Vission Health's medicine package information assistant.
 
-Analyze ONLY what is visibly present on the medicine
-strip, box or package.
+Carefully examine the medicine strip, box or package.
 
-You must NOT:
-- diagnose a disease
-- prescribe medicine
-- tell the patient to start, stop or change a medicine
-- invent a medicine name
-- guess the strength
-- invent dosage or timing that is not explicitly visible
-- give dosage instructions that are not printed on the package
+Return ONLY ONE JSON OBJECT.
 
-Return ONLY valid JSON.
+Do not use markdown.
+Do not use ```json.
+Do not write explanations outside JSON.
 
-Required format:
+Use exactly these fields:
 
 {
   "medicine_name": "",
   "strength": "",
-  "composition": "",
-  "general_use": "",
-  "dosage": null,
-  "timing": null,
-  "duration": null,
-  "expiry": "",
-  "batch_number": "",
-  "manufacturer": "",
+  "medicine_type": "",
+  "what_it_appears_to_be_for": "",
+  "instructions_visible": "",
   "confidence": "LOW",
-  "visible_instructions": [],
-  "warnings": [],
-  "needs_verification": true
+  "needs_verification": true,
+  "simple_explanation": "",
+  "warning": "",
+  "visible_text": ""
 }
 
-Rules:
+IMPORTANT RULES:
 
-1. medicine_name must be the exact name as printed.
-2. strength must be exactly as printed, e.g. "500 mg".
-3. composition should reflect printed active ingredients.
-4. general_use should state what the medicine is generally
-   used for, ONLY if the medicine name is confidently identified.
-   If the medicine cannot be identified, set it to "".
-5. dosage, timing and duration must be null unless they are
-   explicitly printed on the package or prescription.
-   Do not infer them from general knowledge.
-6. visible_instructions must contain only text that is
-   literally printed on the packaging.
-7. warnings must contain only printed warnings.
-8. confidence must be exactly one of:
-   LOW, MEDIUM, HIGH
-9. needs_verification should normally be true.
-10. If the medicine cannot be identified from the image,
-    set medicine_name to "" and confidence to "LOW".
-11. If the image is blurry, dark, cropped or unclear,
-    still return the JSON, but set confidence to "LOW"
-    and explain in visible_instructions that the image is unclear.
-12. Never invent information.
+1. Read ONLY information visible in the image.
+2. medicine_name must be the clearly readable brand/product name.
+3. strength must be copied from the package if visible.
+4. medicine_type can be tablet, capsule, syrup, etc. only when clear.
+5. what_it_appears_to_be_for should describe the GENERAL COMMON USE
+   only when the medicine identity is confidently readable.
+6. Do NOT diagnose the patient.
+7. Do NOT prescribe the medicine.
+8. Do NOT tell the patient to start, stop or change the medicine.
+9. Do NOT invent dosage.
+10. Do NOT invent timing.
+11. instructions_visible must contain dosage/timing ONLY if explicitly
+    printed and readable in the image.
+12. confidence must be LOW, MEDIUM or HIGH.
+13. needs_verification should normally be true.
+14. simple_explanation should explain the general purpose in simple language.
+15. warning should advise verification with a doctor, pharmacist or ASHA worker.
+16. visible_text should contain important readable text from the package.
+17. If the package is unclear, return empty medicine_name and LOW confidence.
+18. Never guess.
+
+Example:
+
+{
+  "medicine_name": "Example Tablet",
+  "strength": "10 mg",
+  "medicine_type": "tablet",
+  "what_it_appears_to_be_for": "general allergy symptom relief",
+  "instructions_visible": "",
+  "confidence": "HIGH",
+  "needs_verification": true,
+  "simple_explanation": "This medicine is generally used to relieve allergy-related symptoms.",
+  "warning": "Confirm the medicine and prescribed dose with a pharmacist or doctor.",
+  "visible_text": "Example Tablet 10 mg"
+}
 """
 
         def call_groq():
@@ -562,8 +565,8 @@ Rules:
                                 "type": "text",
                                 "text": (
                                     "Read this medicine package carefully. "
-                                    "Extract only visible printed information. "
-                                    "Return ONLY a JSON object matching the requested format."
+                                    "Return exactly one JSON object using the "
+                                    "required fields."
                                 ),
                             },
                             {
@@ -579,9 +582,7 @@ Rules:
                     },
                 ],
                 temperature=0,
-                max_completion_tokens=600,
-                reasoning_format="hidden",
-                response_format={"type": "json_object"},
+                max_completion_tokens=700,
             )
 
         response = await asyncio.wait_for(
@@ -599,12 +600,43 @@ Rules:
 
         cleaned = content.strip()
 
-        if cleaned.startswith("```"):
-            cleaned = cleaned.replace("```json", "", 1)
-            cleaned = cleaned.replace("```", "", 1)
-            cleaned = cleaned.strip()
+        # Remove markdown fences if model accidentally adds them.
+        if "```json" in cleaned:
+            cleaned = cleaned.replace("```json", "")
 
-        data = json.loads(cleaned)
+        cleaned = cleaned.replace("```", "").strip()
+
+        # Extract JSON object if model added a small prefix/suffix.
+        first = cleaned.find("{")
+        last = cleaned.rfind("}")
+
+        if first >= 0 and last > first:
+            cleaned = cleaned[first:last + 1]
+
+        try:
+            data = json.loads(cleaned)
+
+        except json.JSONDecodeError:
+
+            # Safe fallback for demo.
+            data = {
+                "medicine_name": "",
+                "strength": "",
+                "medicine_type": "",
+                "what_it_appears_to_be_for": "",
+                "instructions_visible": "",
+                "confidence": "LOW",
+                "needs_verification": True,
+                "simple_explanation": (
+                    "The medicine package could not be read reliably "
+                    "from this image."
+                ),
+                "warning": (
+                    "Please verify the medicine, strength and instructions "
+                    "with a pharmacist, doctor or ASHA worker."
+                ),
+                "visible_text": cleaned[:1000],
+            }
 
         if not isinstance(data, dict):
             raise HTTPException(
@@ -612,24 +644,67 @@ Rules:
                 detail="Vision AI returned an invalid result."
             )
 
-        data.setdefault("medicine_name", "")
-        data.setdefault("strength", "")
-        data.setdefault("composition", "")
-        data.setdefault("general_use", "")
-        data.setdefault("dosage", None)
-        data.setdefault("timing", None)
-        data.setdefault("duration", None)
-        data.setdefault("expiry", "")
-        data.setdefault("batch_number", "")
-        data.setdefault("manufacturer", "")
-        data.setdefault("confidence", "LOW")
-        data.setdefault("visible_instructions", [])
-        data.setdefault("warnings", [])
-        data.setdefault("needs_verification", True)
+        confidence = str(
+            data.get("confidence") or "LOW"
+        ).upper()
+
+        if confidence not in {
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+        }:
+            confidence = "LOW"
+
+        normalized = {
+            "medicine_name": str(
+                data.get("medicine_name") or ""
+            ),
+
+            "strength": str(
+                data.get("strength") or ""
+            ),
+
+            "medicine_type": str(
+                data.get("medicine_type") or ""
+            ),
+
+            "what_it_appears_to_be_for": str(
+                data.get("what_it_appears_to_be_for") or ""
+            ),
+
+            "instructions_visible": str(
+                data.get("instructions_visible") or ""
+            ),
+
+            "confidence": confidence,
+
+            "needs_verification": bool(
+                data.get(
+                    "needs_verification",
+                    True
+                )
+            ),
+
+            "simple_explanation": str(
+                data.get("simple_explanation")
+                or
+                "Please verify this medicine with a healthcare professional."
+            ),
+
+            "warning": str(
+                data.get("warning")
+                or
+                "Confirm the medicine with an ASHA worker, doctor or pharmacist."
+            ),
+
+            "visible_text": str(
+                data.get("visible_text") or ""
+            ),
+        }
 
         return {
             "success": True,
-            "data": data,
+            "data": normalized,
         }
 
     except asyncio.TimeoutError:
@@ -639,12 +714,6 @@ Rules:
                 "Vision AI took too long to respond. "
                 "Please try a clearer or smaller image."
             )
-        )
-
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=502,
-            detail="Vision AI returned invalid JSON."
         )
 
     except HTTPException:
