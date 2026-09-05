@@ -257,7 +257,7 @@ class _HealthAssistantScreenState
     await _voiceService.stopTts();
 
     try {
-      final result = await HealthAssistantService.ask(
+      final response = await HealthAssistantService().askAssistant(
         query: query,
         language: _language,
       ).timeout(
@@ -267,9 +267,6 @@ class _HealthAssistantScreenState
       if (!mounted) {
         return;
       }
-
-      final response =
-          result['response']?.toString().trim() ?? '';
 
       if (response.isEmpty) {
         throw Exception(
@@ -282,7 +279,6 @@ class _HealthAssistantScreenState
         _loading = false;
       });
 
-      // Speak the AI answer automatically.
       await _speakResponse(response);
     } on TimeoutException {
       if (!mounted) {

@@ -24,9 +24,9 @@ class _SchemeHospitalMapScreenState
     extends State<SchemeHospitalMapScreen> {
   final MapController _mapController = MapController();
 
-  bool _showFacilities = true;
+  final bool _showFacilities = true;
 
-  LatLng _patientLocation = const LatLng(
+  final LatLng _patientLocation = const LatLng(
     13.0827,
     80.2707,
   );
@@ -208,7 +208,7 @@ class _SchemeHospitalMapScreenState
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.20),
+                color: Colors.black.withValues(alpha: 0.20),
                 blurRadius: 8,
               ),
             ],
@@ -244,7 +244,7 @@ class _SchemeHospitalMapScreenState
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.20),
+                        color: Colors.black.withValues(alpha: 0.20),
                         blurRadius: 6,
                       ),
                     ],
@@ -345,7 +345,7 @@ class _SchemeHospitalMapScreenState
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
+                  color: Colors.black.withValues(alpha: 0.15),
                   blurRadius: 8,
                 ),
               ],
