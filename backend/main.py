@@ -419,7 +419,7 @@ a healthcare professional.
         response = await asyncio.wait_for(
             asyncio.to_thread(
                 lambda: client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-8b-instant",
                     messages=[
                         {
                             "role": "system",
@@ -431,7 +431,7 @@ a healthcare professional.
                         },
                     ],
                     temperature=0.2,
-                    max_tokens=500,
+                    max_tokens=300,
                 )
             ),
             timeout=30,
