@@ -5,29 +5,56 @@ class HealthAssistantService {
   static const String baseUrl =
       'https://vision-health.onrender.com';
 
-  static Future<Map<String, dynamic>> ask({
+  Future<String> askAssistant({
     required String query,
-    String language = 'English',
+    required String language,
   }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/health-assistant'),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'query': query,
-        'language': language,
-      }),
-    );
+    final uri = Uri.parse('$baseUrl/health-assistant');
 
-    if (response.statusCode != 200) {
-      throw Exception(
-        'Health assistant failed: ${response.body}',
-      );
+    try {
+      final response = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              'query': query.trim(),
+              'language': language,
+            }),
+          )
+          .timeout(const Duration(seconds: 60));
+
+      print('Health Assistant status: ${response.statusCode}');
+      print('Health Assistant body: ${response.body}');
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Health Assistant error ${response.statusCode}: '
+          '${response.body}',
+        );
+      }
+
+      final decoded = jsonDecode(response.body);
+
+      if (decoded['success'] != true) {
+        throw Exception(
+          decoded['response']?.toString() ??
+              'Health Assistant returned an invalid response.',
+        );
+      }
+
+      final answer = decoded['response']?.toString().trim();
+
+      if (answer == null || answer.isEmpty) {
+        throw Exception('Health Assistant returned an empty response.');
+      }
+
+      return answer;
+    } catch (e) {
+      print('Health Assistant request failed: $e');
+      rethrow;
     }
-
-    return Map<String, dynamic>.from(
-      jsonDecode(response.body),
-    );
   }
 }

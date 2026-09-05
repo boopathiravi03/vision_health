@@ -132,14 +132,10 @@ class _PatientAiAssistantScreenState
     });
 
     try {
-      final result = await HealthAssistantService.ask(
+      final answer = await HealthAssistantService().askAssistant(
         query: question,
         language: _language,
       );
-
-      final answer =
-          result['response']?.toString().trim() ??
-              'I could not understand the request.';
 
       if (!mounted) return;
 
